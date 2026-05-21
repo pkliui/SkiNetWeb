@@ -49,6 +49,27 @@ jobs:
       - name: Containers before scaling up
         run: docker ps -a
 
+      # --- skinet-service (deploy first — backend depends on it, model takes time to load) ---
+
+      - name: Scale up skinet-service to 2 instances
+        run: |
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb
+          docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale skinet-service=2 --wait
+
+      - name: Reload nginx
+        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep production-nginx) nginx -s reload
+
+      - name: Update skinet-service
+        run: |
+          old_id=$(docker ps -f name=production-skinet-service --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
+          docker stop $old_id
+          docker rm $old_id
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb
+          docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale skinet-service=1 --wait skinet-service
+          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep production-nginx) nginx -s reload
+
+      # --- frontend ---
+
       - name: Scale up frontend, nginx keeps routing to the old one
         run: |
           cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb
