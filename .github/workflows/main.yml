@@ -1,4 +1,4 @@
-name: Staging deploy workflow
+name: Continuously deploy on EC2 by scaling frontend and backend containers
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build_docker_images:
+  deploy:
     runs-on: self-hosted
     steps:
       - name: Checkout code from the github repo
@@ -30,13 +30,6 @@ jobs:
           cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinet-service
           docker build -t pkliui/skinetweb:staging-skinet-service .
           cd ..
-
-  staging_deploy:
-    needs: build_docker_images
-    runs-on: self-hosted
-    steps:
-      - name: Checkout code from the github repo
-        uses: actions/checkout@v2
 
       - name: Containers before deploy
         run: docker ps -a

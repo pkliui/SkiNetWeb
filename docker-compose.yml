@@ -1,0 +1,62 @@
+name: production
+
+version: '3.8'
+
+services:
+
+  nginx:
+    image: pkliui/skinetweb:production-nginx
+    depends_on:
+      - frontend
+      - backend
+    restart: always
+    build:
+      dockerfile: Dockerfile
+      context: ./nginx
+    ports:
+      - "80:80"
+    mem_reservation: "500M"
+    mem_limit: "2000M"
+    memswap_limit: 2G
+
+  frontend:
+    image: pkliui/skinetweb:production-frontend
+    build:
+      dockerfile: Dockerfile
+      context: "./skinetweb-ui"
+    ports:
+      - "3000"
+    mem_reservation: "500M"
+    mem_limit: "2000M"
+    memswap_limit: 2G
+
+  backend:
+    image: pkliui/skinetweb:production-backend
+    build:
+      dockerfile: Dockerfile
+      context: "./skinetweb-server"
+    ports:
+      - "5000"
+    environment:
+      - INFERENCE_URL=http://skinet-service:5001
+    depends_on:
+      - skinet-service
+    mem_reservation: "500M"
+    mem_limit: "2000M"
+    memswap_limit: 2G
+
+  skinet-service:
+    image: pkliui/skinetweb:production-skinet-service
+    build:
+      dockerfile: Dockerfile
+      context: "./skinet-service"
+    ports:
+      - "5001"
+    environment:
+      - MODEL_PATH=/models/ios_onnx.onnx
+      - SEGMENTATION_THRESHOLD=0.5
+    volumes:
+      - ./models:/models:ro
+    mem_reservation: "500M"
+    mem_limit: "2000M"
+    memswap_limit: 2G
