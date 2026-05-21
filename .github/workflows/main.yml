@@ -15,19 +15,19 @@ jobs:
       - name: Build Docker images for frontend, backend, nginx and skinet-service
         run: |
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinetweb-ui
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinetweb-ui
           docker build -t pkliui/skinetweb:staging-frontend .
           cd ..
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinetweb-server
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinetweb-server
           docker build -t pkliui/skinetweb:staging-backend .
           cd ..
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/nginx
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/nginx
           docker build -t pkliui/skinetweb:staging-nginx .
           cd ..
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinet-service
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinet-service
           docker build -t pkliui/skinetweb:staging-skinet-service .
           cd ..
 
@@ -45,7 +45,7 @@ jobs:
 
       - name: Scale up skinet-service to 2 instances
         run: |
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
           docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale skinet-service=2 --wait
 
       - name: Reload nginx
@@ -56,7 +56,7 @@ jobs:
           old_id=$(docker ps -f name=staging-skinet-service --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           docker stop $old_id
           docker rm $old_id
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
           docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale skinet-service=1 --wait
           docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
 
@@ -64,7 +64,7 @@ jobs:
 
       - name: Scale up frontend to 2 instances
         run: |
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
           docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale frontend=2 --wait
 
       - name: Reload nginx
@@ -75,7 +75,7 @@ jobs:
           old_id=$(docker ps -f name=staging-frontend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           docker stop $old_id
           docker rm $old_id
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
           docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale frontend=1 --wait
           docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
 
@@ -83,7 +83,7 @@ jobs:
 
       - name: Scale up backend to 2 instances
         run: |
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
           docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale backend=2 --wait
 
       - name: Reload nginx
@@ -94,7 +94,7 @@ jobs:
           old_id=$(docker ps -f name=staging-backend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           docker stop $old_id
           docker rm $old_id
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
           docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale backend=1 --wait
           docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
 
