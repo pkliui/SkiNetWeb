@@ -1,103 +1,93 @@
-name: Staging deploy workflow
+name: Continuously deploy on EC2 by scaling frontend and backend containers
 
 on:
   push:
     branches:
-      - main
+      - prod
 
 jobs:
-  build_docker_images:
+  deploy:
     runs-on: self-hosted
     steps:
       - name: Checkout code from the github repo
         uses: actions/checkout@v2
 
-      - name: Build Docker images for frontend, backend and nginx
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{secrets.DOCKER_USERNAME}}
+          password: ${{secrets.DOCKER_TOKEN}}
+
+      - name: Build and push updated Docker images for frontend, backend, nginx and skinet-service
         run: |
 
-          cd ~/actions-runner/_work/notes_app/notes_app/notesapp-ui
-          docker build -t pkliui/notes_app:staging-frontend .
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinetweb-ui
+          docker build --no-cache -t pkliui/skinetweb:production-frontend .
+          docker push pkliui/skinetweb:production-frontend
           cd ..
 
-          cd ~/actions-runner/_work/notes_app/notes_app/notesapp-server
-          docker build -t pkliui/notes_app:staging-backend .
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinetweb-server
+          docker build --no-cache -t pkliui/skinetweb:production-backend .
+          docker push pkliui/skinetweb:production-backend
           cd ..
 
-          cd ~/actions-runner/_work/notes_app/notes_app/nginx
-          docker build -t pkliui/notes_app:staging-nginx .
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/nginx
+          docker build --no-cache -t pkliui/skinetweb:production-nginx .
+          docker push pkliui/skinetweb:production-nginx
           cd ..
 
-  staging_deploy:
-    needs: build_docker_images
-    runs-on: self-hosted
-    steps:
-      - name: Checkout code from the github repo
-        uses: actions/checkout@v2
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinet-service
+          docker build --no-cache -t pkliui/skinetweb:production-skinet-service .
+          docker push pkliui/skinetweb:production-skinet-service
+          cd ..
 
-      - name: Create an environment file for the backend container with the DATABASE_URL secret
+      - name: Pull freshly pushed images for compose
         run: |
-
-          cd ~/actions-runner/_work/notes_app/notes_app/notesapp-server
-          echo "DATABASE_URL=${{secrets.DATABASE_URL}}" > .env
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          docker compose pull frontend backend nginx skinet-service
 
       - name: Containers before scaling up
         run: docker ps -a
 
-      - name: Scale up containers, nginx keeps routing to the old ones
+      - name: Scale up frontend, nginx keeps routing to the old one
         run: |
-          cd ~/actions-runner/_work/notes_app/notes_app/
-          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale frontend=2 --wait
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale frontend=2 --wait
 
       - name: Reload nginx without restarting its container
-        # in the following, $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) command gets the containers' name (most probably staging-nginx-1),
-        # given the nginx image is staging-nginx
-        # with compose project name "staging", the nginx and other containers resolve to staging-nginx-1, staging-frontend-1, staging-frontend-2, staging-backend-1, staging-backend-2
-        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep production-nginx) nginx -s reload
 
-      - name: Containers after scaling up
+      - name: Containers after scaling up frontend
         run: docker ps -a
 
       - name: Update the frontend
         run: |
-
-          # get the "old" container ID (this is the currently running container)
-          old_frontend_id=$(docker ps -f name=staging-frontend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
-          # take the old container offline
+          old_frontend_id=$(docker ps -f name=production-frontend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           docker stop $old_frontend_id
           docker rm $old_frontend_id
-          # put the new container into use and reload nginx
-          cd ~/actions-runner/_work/notes_app/notes_app/
-          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale frontend=1 --wait
-          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale frontend=1 --wait frontend
+          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep production-nginx) nginx -s reload
 
-      - name: Scale up containers, nginx keeps routing to the old ones
+      - name: Scale up backend, nginx keeps routing to the old one
         run: |
-          cd ~/actions-runner/_work/notes_app/notes_app/
-          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale backend=2 --wait
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale backend=2 --wait
 
       - name: Reload nginx without restarting its container
-        # in the following, $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) command gets the containers' name (most probably staging-nginx-1),
-        # given the nginx image is staging-nginx
-        # with compose project name "staging", the nginx and other containers resolve to staging-nginx-1, staging-frontend-1, staging-frontend-2, staging-backend-1, staging-backend-2
-        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep production-nginx) nginx -s reload
 
-      - name: Containers after scaling up
+      - name: Containers after scaling up backend
         run: docker ps -a
-
 
       - name: Update the backend
         run: |
-
-          # get the "old" container ID (this is the currently running container)
-          old_backend_id=$(docker ps -f name=staging-backend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
-          # take the old container offline
+          old_backend_id=$(docker ps -f name=production-backend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           docker stop $old_backend_id
           docker rm $old_backend_id
-          # put the new container into use and reload nginx
-          cd ~/actions-runner/_work/notes_app/notes_app/
-          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale backend=1 --wait
-          # with compose project name "staging", the nginx and other containers resolve to staging-nginx-1, staging-frontend-1, staging-frontend-2, staging-backend-1, staging-backend-2
-          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale backend=1 --wait backend
+          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep production-nginx) nginx -s reload
 
       - name: Containers after updating frontend and backend
         run: docker ps -a
