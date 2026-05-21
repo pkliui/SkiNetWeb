@@ -5,7 +5,7 @@ version: '3.8'
 services:
 
   nginx:
-    image: pkliui/notes_app:staging-nginx
+    image: pkliui/skinetweb:staging-nginx
     depends_on:
       - frontend
       - backend
@@ -19,10 +19,8 @@ services:
     mem_limit: "2000M"
     memswap_limit: 2G
 
-
-
   frontend:
-    image: pkliui/notes_app:staging-frontend
+    image: pkliui/skinetweb:staging-frontend
     build:
       dockerfile: Dockerfile
       context: "./notesapp-ui"
@@ -32,16 +30,33 @@ services:
     mem_limit: "2000M"
     memswap_limit: 2G
 
-
   backend:
-    image: pkliui/notes_app:staging-backend
+    image: pkliui/skinetweb:staging-backend
     build:
       dockerfile: Dockerfile
       context: "./notesapp-server"
     ports:
       - "5000"
-    env_file:
-      - ./notesapp-server/.env
+    environment:
+      - INFERENCE_URL=http://skinet-service:5001
+    depends_on:
+      - skinet-service
+    mem_reservation: "500M"
+    mem_limit: "2000M"
+    memswap_limit: 2G
+
+  skinet-service:
+    image: pkliui/skinetweb:staging-skinet-service
+    build:
+      dockerfile: Dockerfile
+      context: "./skinet-service"
+    ports:
+      - "5001"
+    environment:
+      - MODEL_PATH=/models/ios_onnx.onnx
+      - SEGMENTATION_THRESHOLD=0.5
+    volumes:
+      - ./models:/models:ro
     mem_reservation: "500M"
     mem_limit: "2000M"
     memswap_limit: 2G
