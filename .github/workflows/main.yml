@@ -21,29 +21,29 @@ jobs:
       - name: Build and push updated Docker images for frontend, backend, nginx and skinet-service
         run: |
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinetweb-ui
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinetweb-ui
           docker build --no-cache -t pkliui/skinetweb:production-frontend .
           docker push pkliui/skinetweb:production-frontend
           cd ..
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinetweb-server
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinetweb-server
           docker build --no-cache -t pkliui/skinetweb:production-backend .
           docker push pkliui/skinetweb:production-backend
           cd ..
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/nginx
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/nginx
           docker build --no-cache -t pkliui/skinetweb:production-nginx .
           docker push pkliui/skinetweb:production-nginx
           cd ..
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinet-service
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinet-service
           docker build --no-cache -t pkliui/skinetweb:production-skinet-service .
           docker push pkliui/skinetweb:production-skinet-service
           cd ..
 
       - name: Pull freshly pushed images for compose
         run: |
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb
           docker compose pull frontend backend nginx skinet-service
 
       - name: Containers before scaling up
@@ -51,7 +51,7 @@ jobs:
 
       - name: Scale up frontend, nginx keeps routing to the old one
         run: |
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb
           docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale frontend=2 --wait
 
       - name: Reload nginx without restarting its container
@@ -65,13 +65,13 @@ jobs:
           old_frontend_id=$(docker ps -f name=production-frontend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           docker stop $old_frontend_id
           docker rm $old_frontend_id
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb
           docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale frontend=1 --wait frontend
           docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep production-nginx) nginx -s reload
 
       - name: Scale up backend, nginx keeps routing to the old one
         run: |
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb
           docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale backend=2 --wait
 
       - name: Reload nginx without restarting its container
@@ -85,7 +85,7 @@ jobs:
           old_backend_id=$(docker ps -f name=production-backend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           docker stop $old_backend_id
           docker rm $old_backend_id
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb
           docker compose -f docker-compose.yml up -d --no-build --force-recreate --scale backend=1 --wait backend
           docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep production-nginx) nginx -s reload
 
