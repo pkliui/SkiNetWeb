@@ -1,45 +1,38 @@
-name: Continuously deploy on EC2 by scaling frontend and backend containers
+name: Staging deploy workflow
 
 on:
   push:
     branches:
-      - prod
+      - main
 
 jobs:
-  deploy:
+  build_docker_images:
     runs-on: self-hosted
     steps:
       - name: Checkout code from the github repo
         uses: actions/checkout@v2
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{secrets.DOCKER_USERNAME}}
-          password: ${{secrets.DOCKER_TOKEN}}
-
-      - name: Build and push updated Docker images for frontend, backend and nginx
+      - name: Build Docker images for frontend, backend and nginx
         run: |
 
           cd ~/actions-runner/_work/notes_app/notes_app/notesapp-ui
-          docker build --no-cache -t pkliui/notes_app:notes_app-frontend .
-          docker push pkliui/notes_app:notes_app-frontend
+          docker build -t pkliui/notes_app:staging-frontend .
           cd ..
 
           cd ~/actions-runner/_work/notes_app/notes_app/notesapp-server
-          docker build --no-cache -t pkliui/notes_app:notes_app-backend .
-          docker push pkliui/notes_app:notes_app-backend
+          docker build -t pkliui/notes_app:staging-backend .
           cd ..
 
           cd ~/actions-runner/_work/notes_app/notes_app/nginx
-          docker build --no-cache -t pkliui/notes_app:notes_app-nginx .
-          docker push pkliui/notes_app:notes_app-nginx
+          docker build -t pkliui/notes_app:staging-nginx .
           cd ..
 
-      - name: Pull freshly pushed images for compose
-        run: |
-          cd ~/actions-runner/_work/notes_app/notes_app
-          docker compose pull frontend backend nginx
+  staging_deploy:
+    needs: build_docker_images
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code from the github repo
+        uses: actions/checkout@v2
 
       - name: Create an environment file for the backend container with the DATABASE_URL secret
         run: |
@@ -51,12 +44,15 @@ jobs:
         run: docker ps -a
 
       - name: Scale up containers, nginx keeps routing to the old ones
-        run: docker compose up -d --no-build --force-recreate --scale frontend=2 --wait
+        run: |
+          cd ~/actions-runner/_work/notes_app/notes_app/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale frontend=2 --wait
 
       - name: Reload nginx without restarting its container
-        # in the following, $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep notes_app-nginx) command gets the containers' name (most probably notes_app-nginx-1),
-        # given the nginx image is notes_app-nginx
-        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep notes_app-nginx) nginx -s reload
+        # in the following, $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) command gets the containers' name (most probably staging-nginx-1),
+        # given the nginx image is staging-nginx
+        # with compose project name "staging", the nginx and other containers resolve to staging-nginx-1, staging-frontend-1, staging-frontend-2, staging-backend-1, staging-backend-2
+        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
 
       - name: Containers after scaling up
         run: docker ps -a
@@ -65,21 +61,25 @@ jobs:
         run: |
 
           # get the "old" container ID (this is the currently running container)
-          old_frontend_id=$(docker ps -f name=notes_app-frontend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
+          old_frontend_id=$(docker ps -f name=staging-frontend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           # take the old container offline
           docker stop $old_frontend_id
           docker rm $old_frontend_id
           # put the new container into use and reload nginx
-          docker compose up -d --no-build --force-recreate --scale frontend=1 --wait frontend
-          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep notes_app-nginx) nginx -s reload
+          cd ~/actions-runner/_work/notes_app/notes_app/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale frontend=1 --wait
+          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
 
       - name: Scale up containers, nginx keeps routing to the old ones
-        run: docker compose up -d --no-build --force-recreate --scale backend=2 --wait
+        run: |
+          cd ~/actions-runner/_work/notes_app/notes_app/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale backend=2 --wait
 
       - name: Reload nginx without restarting its container
-        # in the following, $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep notes_app-nginx) command gets the containers' name (most probably notes_app-nginx-1),
-        # given the nginx image is notes_app-nginx
-        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep notes_app-nginx) nginx -s reload
+        # in the following, $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) command gets the containers' name (most probably staging-nginx-1),
+        # given the nginx image is staging-nginx
+        # with compose project name "staging", the nginx and other containers resolve to staging-nginx-1, staging-frontend-1, staging-frontend-2, staging-backend-1, staging-backend-2
+        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
 
       - name: Containers after scaling up
         run: docker ps -a
@@ -89,13 +89,15 @@ jobs:
         run: |
 
           # get the "old" container ID (this is the currently running container)
-          old_backend_id=$(docker ps -f name=notes_app-backend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
+          old_backend_id=$(docker ps -f name=staging-backend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
           # take the old container offline
           docker stop $old_backend_id
           docker rm $old_backend_id
           # put the new container into use and reload nginx
-          docker compose up -d --no-build --force-recreate --scale backend=1 --wait backend
-          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep notes_app-nginx) nginx -s reload
+          cd ~/actions-runner/_work/notes_app/notes_app/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale backend=1 --wait
+          # with compose project name "staging", the nginx and other containers resolve to staging-nginx-1, staging-frontend-1, staging-frontend-2, staging-backend-1, staging-backend-2
+          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
 
       - name: Containers after updating frontend and backend
         run: docker ps -a

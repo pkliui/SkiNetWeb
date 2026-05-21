@@ -5,24 +5,19 @@
 
 # backend
 /notesapp-server/node_modules
-/notesapp-server/.env
-/notesapp-server/src/generated/prisma
 /notesapp-server/dist
+/notesapp-server/src/generated/prisma
+/notesapp-server/.env
 
-# testing
-/coverage
-
-# production
-/build
+/notesapp-server/src/**/*.js
+/notesapp-server/src/**/*.js.map
+/notesapp-server/src/**/*.d.ts
+/notesapp-server/src/**/*.d.ts.map
+/notesapp-server/prisma.config.js
+/notesapp-server/prisma.config.js.map
+/notesapp-server/prisma.config.d.ts
+/notesapp-server/prisma.config.d.ts.map
 
 # misc
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*

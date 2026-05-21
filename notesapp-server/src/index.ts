@@ -1,98 +1,44 @@
-import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "./generated/prisma/client.js";
+import multer from "multer";
 
 const PORT = process.env.PORT || 5000;
-
-// Validate environment variables to satisfy exactOptionalPropertyTypes
-const databaseUrl = process.env["DATABASE_URL"];
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL environment variable is required");
-}
-
-const adapter = new PrismaPg({ connectionString: databaseUrl });
-const prisma = new PrismaClient({ adapter });
+const INFERENCE_URL = process.env.INFERENCE_URL || "http://skinet-service:5001";
 
 const app = express();
-app.use(express.json());
 app.use(cors());
 
-// create get endpoint
-app.get("/api/notes", async (req, res) => {
+const upload = multer({ storage: multer.memoryStorage() });
 
-     // use Prisma to get all data from the data base
-     // .note references the model we created in schema.prisma
-     const notes = await prisma.note.findMany();
-    // update with the notes!!
-    res.json(notes);
-})
+app.post("/api/segment", upload.single("image"), async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: "No image file provided" });
+    return;
+  }
 
-// create post endpoint to add notes
-app.post("/api/notes", async (req, res) => {
+  try {
+    const formData = new FormData();
+    const blob = new Blob([new Uint8Array(req.file.buffer)], { type: req.file.mimetype });
+    formData.append("image", blob, req.file.originalname);
 
-    const {title, content} = req.body;
+    const inferenceRes = await fetch(`${INFERENCE_URL}/infer`, {
+      method: "POST",
+      body: formData,
+    });
 
+    if (!inferenceRes.ok) {
+      res.status(502).json({ error: "Inference service error" });
+      return;
+    }
 
-    //if (!title || !content) {
-    //    return res.status(400).send("title and content fields required");
-    //  }
-
-    try{
-        const note = await prisma.note.create({
-            data: {title, content},
-        });
-        // response with a json note
-        res.json(note);
-     } catch(error){
-        res.status(500).send("Oops something went wrong");
-     }
+    const maskBuffer = Buffer.from(await inferenceRes.arrayBuffer());
+    res.set("Content-Type", "image/png");
+    res.send(maskBuffer);
+  } catch {
+    res.status(503).json({ error: "Inference service unavailable" });
+  }
 });
 
-
-// create put endpoint to update notes
-app.put("/api/notes/:id", async(req, res)=>{
-
-    // specify body and ID
-    const {title, content} = req.body;
-    const id = parseInt(req.params.id);
-
-    //if(!id || isNaN(id)){
-    //    return res
-    //        .status(400)
-    //        .send("ID must be valid number");
-    //}
-    try{
-        const updatedNote = await prisma.note.update({
-            where: {id},
-            data: {title, content}
-        });
-        res.json(updatedNote);
-    }catch (error){
-        res
-          .status(500)
-          .send("opps, something went wrongs again");
-    }
-})
-
-// delete notes
-app.delete("/api/notes/:id", async (req, res) =>{
-    const id = parseInt(req.params.id);
-
-    // validation missing
-    try{
-        await prisma.note.delete({
-                where:{id},
-        });
-        res.status(204).send();
-    } catch(error){
-        res
-            .status(500)
-            .send("oops, something went wrongs");
-    }
-})
-
-app.listen(PORT, () =>{
-        console.log(`Backend is running on port ${PORT}`)
+app.listen(PORT, () => {
+  console.log(`Backend is running on port ${PORT}`);
 });

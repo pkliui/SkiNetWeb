@@ -1,6 +1,6 @@
 # The Green Notes App
 
-Welcome to [**The Green Notes App - a daily notes application. Try it here!**](http://16.171.226.39:8000/) 
+Welcome to [**The Green Notes App - a daily notes application. Try it here!**](http://16.16.202.122/) 
 
  [**Read full online documentation here**](docs/docs.md)
 
