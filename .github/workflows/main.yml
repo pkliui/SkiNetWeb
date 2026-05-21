@@ -15,11 +15,11 @@ jobs:
       - name: Build Docker images for frontend, backend, nginx and skinet-service
         run: |
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/notesapp-ui
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinetweb-ui
           docker build -t pkliui/skinetweb:staging-frontend .
           cd ..
 
-          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/notesapp-server
+          cd ~/actions-runner/_work/SkiNetWeb/SkiNetWeb/skinetweb-server
           docker build -t pkliui/skinetweb:staging-backend .
           cd ..
 

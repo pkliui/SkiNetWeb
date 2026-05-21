@@ -23,7 +23,7 @@ services:
     image: pkliui/skinetweb:staging-frontend
     build:
       dockerfile: Dockerfile
-      context: "./notesapp-ui"
+      context: "./skinetweb-ui"
     ports:
       - "3000"
     mem_reservation: "500M"
@@ -34,7 +34,7 @@ services:
     image: pkliui/skinetweb:staging-backend
     build:
       dockerfile: Dockerfile
-      context: "./notesapp-server"
+      context: "./skinetweb-server"
     ports:
       - "5000"
     environment:
