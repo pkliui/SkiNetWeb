@@ -14,7 +14,7 @@ services:
       dockerfile: Dockerfile
       context: ./nginx
     ports:
-      - "8000:80"
+      - "8001:80"
     mem_reservation: "500M"
     mem_limit: "2000M"
     memswap_limit: 2G
