@@ -1,0 +1,95 @@
+name: Continuously deploy on EC2 by scaling frontend and backend containers
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code from the github repo
+        uses: actions/checkout@v2
+
+      - name: Build Docker images for frontend, backend, nginx and skinet-service
+        run: |
+
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinetweb-ui
+          docker build -t pkliui/skinetweb:staging-frontend .
+          cd ..
+
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinetweb-server
+          docker build -t pkliui/skinetweb:staging-backend .
+          cd ..
+
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/nginx
+          docker build -t pkliui/skinetweb:staging-nginx .
+          cd ..
+
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/skinet-service
+          docker build -t pkliui/skinetweb:staging-skinet-service .
+          cd ..
+
+      - name: Containers before deploy
+        run: docker ps -a
+
+      # --- skinet-service (model loads on startup — scale up before touching backend) ---
+
+      - name: Scale up skinet-service to 2 instances
+        run: |
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale skinet-service=2 --wait
+
+      - name: Reload nginx
+        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+
+      - name: Replace old skinet-service instance
+        run: |
+          old_id=$(docker ps -f name=staging-skinet-service --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
+          docker stop $old_id
+          docker rm $old_id
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale skinet-service=1 --wait
+          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+
+      # --- frontend ---
+
+      - name: Scale up frontend to 2 instances
+        run: |
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale frontend=2 --wait
+
+      - name: Reload nginx
+        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+
+      - name: Replace old frontend instance
+        run: |
+          old_id=$(docker ps -f name=staging-frontend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
+          docker stop $old_id
+          docker rm $old_id
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale frontend=1 --wait
+          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+
+      # --- backend ---
+
+      - name: Scale up backend to 2 instances
+        run: |
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale backend=2 --wait
+
+      - name: Reload nginx
+        run: docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+
+      - name: Replace old backend instance
+        run: |
+          old_id=$(docker ps -f name=staging-backend --format '{{.ID}} {{.CreatedAt}}' | sort -k2,3 | head -n 1 | awk '{print $1}')
+          docker stop $old_id
+          docker rm $old_id
+          cd ~/actions-runner-skinet/_work/SkiNetWeb/SkiNetWeb/
+          docker compose -f docker-compose-staging.yml up -d --no-build --force-recreate --scale backend=1 --wait
+          docker exec $(sudo docker ps -q | xargs sudo docker inspect --format='{{.Name}}' | grep staging-nginx) nginx -s reload
+
+      - name: Containers after deploy
+        run: docker ps -a
