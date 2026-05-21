@@ -45,7 +45,11 @@ const App = () => {
       });
 
       if (!response.ok) {
-        const err = await response.json() as { error: string };
+        if (response.status === 413) {
+          setError("Image is too large. Please use a smaller photo.");
+          return;
+        }
+        const err = await response.json().catch(() => ({ error: "Segmentation failed" })) as { error: string };
         setError(err.error ?? "Segmentation failed");
         return;
       }
