@@ -11,16 +11,16 @@ services:
       dockerfile: Dockerfile.dev
       context: ./nginx
     ports:
-      - "8000:80"
+      - "8002:80"
 
 
   frontend:
     build:
       dockerfile: Dockerfile.dev
-      context: "./notesapp-ui"
+      context: "./skinetweb-ui"
     volumes:
       - /app/node_modules
-      - ./notesapp-ui:/app
+      - ./skinetweb-ui:/app
     ports:
       - "3000:3000"
 
@@ -28,11 +28,25 @@ services:
   backend:
     build:
       dockerfile: Dockerfile.dev
-      context: "./notesapp-server"
+      context: "./skinetweb-server"
     volumes:
       - /app/node_modules
-      - ./notesapp-server:/app
+      - ./skinetweb-server:/app
     ports:
       - "5000:5000"
     environment:
-      - .env
+      - INFERENCE_URL=http://skinet-service:5001
+    depends_on:
+      - skinet-service
+
+  skinet-service:
+    build:
+      dockerfile: Dockerfile.dev
+      context: "./skinet-service"
+    ports:
+      - "5001:5001"
+    environment:
+      - MODEL_PATH=/models/ios_onnx.onnx
+      - SEGMENTATION_THRESHOLD=0.5
+    volumes:
+      - ./models:/models:ro
