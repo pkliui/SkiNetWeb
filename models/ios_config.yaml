@@ -1,0 +1,159 @@
+DATA_CONFIG:
+  azure_blob_mount_point: /mnt/data/
+  azure_data: false
+  local_data_root: /kaggle/working/isic2017_data_256/
+  split_random_seed: 100
+GENERAL_CONFIG:
+  dataset: ISIC2017_DATASET
+  experiment_type: segmentation
+  model: UNET2D_MODEL
+MODEL_CONFIG:
+  debug_forward: false
+  encoder_residual_mode: classical
+  merge_residual_mode: classical
+  se_reduction: 16
+  validate_forward: false
+SWEEP_CONFIG:
+  batch_size:
+  - 8
+  direction: maximize
+  experiment_name: the-model-sweep-over-encoder
+  lr:
+  - 3e-4
+  monitor: val_best_dice_at_threshold
+  num_workers:
+  - 2
+  prefetch_factor:
+  - 4
+  weight_decay:
+  - 0.0
+TRAIN_CONFIG:
+  accelerator: auto
+  batch_size: 8
+  cache_in_ram: true
+  check_val_every_n_epoch: 5
+  checkpoint_config:
+    filename: epoch{epoch:03d}
+    mode: max
+    monitor: val_best_dice_at_threshold
+    save_last: false
+    save_top_k: 1
+  deterministic: false
+  devices: 2
+  early_stopping_config:
+    check_finite: true
+    divergence_threshold: null
+    min_delta: 0.005
+    mode: max
+    monitor: val_best_dice_at_threshold
+    patience: 30
+    stopping_threshold: null
+    strict: true
+  experiment_name: the-model-sweep-full-grid-1gpu-augm-adam-1s
+  litlogger_config:
+    checkpoint_name: null
+    log_model: false
+    save_logs: false
+    teamspace: l-pkliui
+  log_dir: lightning_logs
+  log_every_n_steps: 10
+  loss_name: bce_dice
+  lr: 3e-4
+  lr_scheduler_config:
+    factor: 0.5
+    mode: max
+    monitor: val_best_dice_at_threshold
+    patience: 3
+  max_epochs: 350
+  mlflow_config:
+    fallback_to_local_mlflow: false
+    log_model: false
+    log_model_summary: true
+    tracking_uri: http://127.0.0.1:5000
+  num_sanity_val_steps: 0
+  num_workers: 2
+  optimal_threshold: 0.5
+  optimizer_name: adam
+  pin_memory: true
+  prefetch_factor: 4
+  run_test_after_fit: false
+  seed: 100
+  strategy: ddp_spawn
+  test_on_val_split: false
+  use_checkpoint: true
+  use_early_stopping: false
+  use_litlogger_logger: false
+  use_lr_scheduler: false
+  use_mlflow_logger: true
+  use_torch_compile: true
+  weight_decay: 0.0
+TRANSFORM_CONFIG:
+  crop:
+    crop_apply: false
+    crop_type: random_resized_crop
+    scale:
+    - 0.8
+    - 1.0
+    size:
+    - 256
+    - 256
+  normalization_mean:
+  - 0.699
+  - 0.556
+  - 0.5121
+  normalization_mode: standard
+  normalization_std:
+  - 0.1576
+  - 0.1562
+  - 0.1706
+  photometric_augmentation:
+    color_jitter_apply: true
+    color_jitter_brightness: 0.2
+    color_jitter_contrast: 0.2
+    color_jitter_hue: 0.05
+    color_jitter_p: 0.5
+    color_jitter_saturation: 0.3
+    gaussian_blur_apply: true
+    gaussian_blur_p: 0.2
+    gaussian_blur_sigma_limit:
+    - 0.5
+    - 2.0
+    gaussian_noise_apply: true
+    gaussian_noise_p: 0.2
+    gaussian_noise_std_range:
+    - 0.05
+    - 0.15
+  seed_value: 100
+  spatial_augmentation:
+    affine_apply: true
+    affine_rotate:
+    - -20
+    - 20
+    affine_scale:
+    - 0.8
+    - 1.0
+    affine_shear:
+      x:
+      - 0
+      - 0
+      y:
+      - 0
+      - 0
+    affine_translate_percent:
+      x:
+      - -0.05
+      - 0.05
+      y:
+      - -0.05
+      - 0.05
+    elastic_alpha: 120
+    elastic_apply: true
+    elastic_p: 0.3
+    elastic_sigma: 10
+    perspective_apply: true
+    perspective_p: 0.2
+    perspective_scale:
+    - 0.05
+    - 0.1
+    square_symmetry_apply: true
+    square_symmetry_p: 0.5

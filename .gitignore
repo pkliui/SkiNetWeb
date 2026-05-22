@@ -1,22 +1,21 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # frontend
-/notesapp-ui/node_modules
+/skinetweb-ui/node_modules
 
 # backend
-/notesapp-server/node_modules
-/notesapp-server/dist
-/notesapp-server/src/generated/prisma
-/notesapp-server/.env
+/skinetweb-server/node_modules
+/skinetweb-server/dist
+/skinetweb-server/.env
+/skinetweb-server/src/**/*.js
+/skinetweb-server/src/**/*.js.map
+/skinetweb-server/src/**/*.d.ts
+/skinetweb-server/src/**/*.d.ts.map
 
-/notesapp-server/src/**/*.js
-/notesapp-server/src/**/*.js.map
-/notesapp-server/src/**/*.d.ts
-/notesapp-server/src/**/*.d.ts.map
-/notesapp-server/prisma.config.js
-/notesapp-server/prisma.config.js.map
-/notesapp-server/prisma.config.d.ts
-/notesapp-server/prisma.config.d.ts.map
+# models
+models/*.ckpt
+models/*.pt
+models/*.pth
 
 # misc
 .DS_Store
