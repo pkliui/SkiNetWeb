@@ -257,6 +257,22 @@ body {
   }
 }
 
+/* Docs iframe — fills the full viewport below the navbar */
+.docs-frame-container {
+  position: fixed;
+  top: 52px; /* navbar height */
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.docs-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
 /* Static pages (Documentation, Network Design) */
 .page-container {
   max-width: 860px;
