@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 
 const NAV_LINKS = [
-  { label: "Documentation", href: "https://pkliui.github.io/SkiNet/" },
-  { label: "About",         href: "https://www.linkedin.com/in/kliuiev/" },
+  { label: "About", href: "https://www.linkedin.com/in/kliuiev/" },
 ];
 
 const PAGE_LINKS = [
