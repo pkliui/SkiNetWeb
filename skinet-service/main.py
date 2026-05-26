@@ -11,14 +11,17 @@ import numpy as np
 import onnxruntime as ort
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import Response
-from PIL import Image
+from PIL import Image, ImageOps
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Preprocessing constants (from SkiNet ios_config.yaml / main_config.yaml)
 # ---------------------------------------------------------------------------
-INPUT_SIZE = 512
+INPUT_SIZE = 256
 MEAN = np.array([0.699, 0.556, 0.5121], dtype=np.float32)
-STD  = np.array([0.1576, 0.1562, 0.1706], dtype=np.float32)
+STD = np.array([0.1576, 0.1562, 0.1706], dtype=np.float32)
 THRESHOLD = float(os.getenv("SEGMENTATION_THRESHOLD", "0.5"))
 MODEL_PATH = os.getenv("MODEL_PATH", "/models/ios_onnx.onnx")
 
@@ -42,18 +45,17 @@ def load_model() -> None:
 # ---------------------------------------------------------------------------
 
 def preprocess(image_bytes: bytes) -> np.ndarray:
-    """PIL image bytes → [1, 3, 512, 512] float32 numpy array."""
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    img = img.resize((INPUT_SIZE, INPUT_SIZE), Image.LANCZOS)
-    arr = np.array(img, dtype=np.float32) / 255.0   # HWC, [0, 1]
-    arr = (arr - MEAN) / STD                          # normalise
-    arr = arr.transpose(2, 0, 1)                      # HWC → CHW
-    return arr[np.newaxis]                            # add batch dim
+    img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
+    img = img.resize((INPUT_SIZE, INPUT_SIZE), resample=Image.Resampling.BILINEAR)
+    arr = np.asarray(img, dtype=np.float32) / 255.0
+    arr = (arr - MEAN) / STD
+    arr = arr.transpose(2, 0, 1)
+    return arr[None, ...]
 
 
 def postprocess(output: np.ndarray) -> bytes:
-    """[1, 1, 512, 512] float32 → PNG bytes (binary mask)."""
-    prob = output[0, 0]                                   # [512, 512]
+    """[1, 1, 256, 256] float32 → PNG bytes (binary mask)."""
+    prob = output[0, 0]
     mask = (prob >= THRESHOLD).astype(np.uint8) * 255
     png_bytes = io.BytesIO()
     Image.fromarray(mask, mode="L").save(png_bytes, format="PNG")
