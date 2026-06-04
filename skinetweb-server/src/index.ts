@@ -16,7 +16,7 @@ const KAGGLE_KERNEL = "kliuiev/isic-2017-256x256";
 const CACHE_DIR      = path.join(os.tmpdir(), "isic-cache");
 const KAGGLE_SUBDIR  = "isic2017_data_256";
 const IMAGES_DIR     = path.join(CACHE_DIR, KAGGLE_SUBDIR, "ISIC-2017_Test_v2_Data", "ISIC-2017_Test_v2_Data");
-const MASKS_DIR      = path.join(CACHE_DIR, KAGGLE_SUBDIR, "ISIC-2017_Test_v2_Part1_GroundTruth", "ISIC-2017_Test_v2_Part1_GroundTruth");
+const MASKS_DIR      = path.join(CACHE_DIR, KAGGLE_SUBDIR, "ISIC-2017_Test_v2_Part1_GroundTruth");
 const MANIFEST_PATH  = path.join(__dirname, "../../isic-manifest.json");
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
