@@ -41,6 +41,11 @@ services:
       - "5000"
     environment:
       - INFERENCE_URL=http://skinet-service:5001
+      - ISIC_IMAGES_PATH=/isic-images
+      - ISIC_MASKS_PATH=/isic-masks
+    volumes:
+      - /teamspace/lightning_storage/isic2017/ISIC2017DATA_256/ISIC-2017_Test_v2_Data/ISIC-2017_Test_v2_Data:/isic-images:ro
+      - /teamspace/lightning_storage/isic2017/ISIC2017DATA_256/ISIC-2017_Test_v2_Part1_GroundTruth/ISIC-2017_Test_v2_Part1_GroundTruth:/isic-masks:ro
     depends_on:
       - skinet-service
     mem_reservation: "500M"
