@@ -33,14 +33,14 @@ services:
   backend:
     image: pkliui/skinetweb:dev-backend
     build:
-      dockerfile: skinetweb-server/Dockerfile
-      context: "."
+      dockerfile: Dockerfile
+      context: "./skinetweb-server"
     ports:
       - "5000"
     environment:
       - INFERENCE_URL=http://skinet-service:5001
-      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
-      - KAGGLE_KEY=${KAGGLE_KEY}
+    volumes:
+      - ~/.kaggle:/root/.kaggle:ro
     depends_on:
       - skinet-service
     mem_reservation: "500M"
