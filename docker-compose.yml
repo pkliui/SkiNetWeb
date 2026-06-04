@@ -35,12 +35,14 @@ services:
     image: pkliui/skinetweb:production-backend
     restart: unless-stopped
     build:
-      dockerfile: Dockerfile
-      context: "./skinetweb-server"
+      dockerfile: skinetweb-server/Dockerfile
+      context: "."
     ports:
       - "5000"
     environment:
       - INFERENCE_URL=http://skinet-service:5001
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - KAGGLE_KEY=${KAGGLE_KEY}
     depends_on:
       - skinet-service
     mem_reservation: "500M"

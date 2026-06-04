@@ -3,49 +3,75 @@ import cors from "cors";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import os from "os";
+import { fileURLToPath } from "url";
 
-const PORT             = process.env["PORT"]             || 5000;
-const INFERENCE_URL    = process.env["INFERENCE_URL"]    || "http://skinet-service:5001";
-const ISIC_IMAGES_PATH = process.env["ISIC_IMAGES_PATH"] || "/isic-images";
-const ISIC_MASKS_PATH  = process.env["ISIC_MASKS_PATH"]  || "/isic-masks";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const PORT          = process.env["PORT"]          || 5000;
+const INFERENCE_URL = process.env["INFERENCE_URL"] || "http://skinet-service:5001";
+const KAGGLE_USER   = process.env["KAGGLE_USERNAME"] || "";
+const KAGGLE_KEY    = process.env["KAGGLE_KEY"]      || "";
+
+const KAGGLE_KERNEL  = "kliuiev/isic-2017-256x256";
+const IMG_PREFIX     = "ISIC-2017_Test_v2_Data/ISIC-2017_Test_v2_Data";
+const MASK_PREFIX    = "ISIC-2017_Test_v2_Part1_GroundTruth/ISIC-2017_Test_v2_Part1_GroundTruth";
+const CACHE_DIR      = path.join(os.tmpdir(), "isic-cache");
+const MANIFEST_PATH  = path.join(__dirname, "../../isic-manifest.json");
+
+fs.mkdirSync(CACHE_DIR, { recursive: true });
+
+const MANIFEST: string[] = (() => {
+  try { return JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf-8")); }
+  catch { console.warn("isic-examples/manifest.json not found — gallery will be empty"); return []; }
+})();
 
 const app = express();
 app.use(cors());
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-app.post("/api/segment", upload.single("image"), async (req: Request, res: Response) => {
-  if (!req.file) {
-    res.status(400).json({ error: "No image file provided" });
-    return;
-  }
+// ── Inference ────────────────────────────────────────────────────────────────
 
+app.post("/api/segment", upload.single("image"), async (req: Request, res: Response) => {
+  if (!req.file) { res.status(400).json({ error: "No image file provided" }); return; }
   try {
     const formData = new FormData();
     const blob = new Blob([new Uint8Array(req.file.buffer)], { type: req.file.mimetype });
     formData.append("image", blob, req.file.originalname);
-
-    const inferenceRes = await fetch(`${INFERENCE_URL}/infer`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!inferenceRes.ok) {
-      res.status(502).json({ error: "Inference service error" });
-      return;
-    }
-
-    const maskBuffer = Buffer.from(await inferenceRes.arrayBuffer());
+    const inferenceRes = await fetch(`${INFERENCE_URL}/infer`, { method: "POST", body: formData });
+    if (!inferenceRes.ok) { res.status(502).json({ error: "Inference service error" }); return; }
     res.set("Content-Type", "image/png");
-    res.send(maskBuffer);
+    res.send(Buffer.from(await inferenceRes.arrayBuffer()));
   } catch {
     res.status(503).json({ error: "Inference service unavailable" });
   }
 });
 
-const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg"]);
+// ── Kaggle helpers ────────────────────────────────────────────────────────────
 
-/** Fisher-Yates shuffle, returns up to n elements. */
+function kaggleAuth(): string {
+  if (!KAGGLE_USER || !KAGGLE_KEY) throw new Error("KAGGLE_USERNAME / KAGGLE_KEY not set");
+  return "Basic " + Buffer.from(`${KAGGLE_USER}:${KAGGLE_KEY}`).toString("base64");
+}
+
+async function fetchKaggleFile(kernelPath: string): Promise<Buffer> {
+  const url = `https://www.kaggle.com/api/v1/kernels/output/${KAGGLE_KERNEL}?fileName=${encodeURIComponent(kernelPath)}`;
+  const res = await fetch(url, { headers: { Authorization: kaggleAuth() } });
+  if (!res.ok) throw new Error(`Kaggle fetch failed ${res.status}: ${kernelPath}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+async function getCachedFile(cacheKey: string, kernelPath: string): Promise<string> {
+  const dest = path.join(CACHE_DIR, cacheKey);
+  if (!fs.existsSync(dest)) {
+    const buf = await fetchKaggleFile(kernelPath);
+    fs.writeFileSync(dest, buf);
+  }
+  return dest;
+}
+
+/** Fisher-Yates pick n from array */
 function pickRandom<T>(arr: T[], n: number): T[] {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -55,74 +81,57 @@ function pickRandom<T>(arr: T[], n: number): T[] {
   return copy.slice(0, n);
 }
 
-/**
- * Returns N randomly chosen ISIC images from ISIC_IMAGES_PATH,
- * each paired with its GT mask from ISIC_MASKS_PATH when available.
- * Query param: count (default 5, max 20).
- */
-app.get("/api/random-examples", (req: Request, res: Response) => {
+// ── Random examples ───────────────────────────────────────────────────────────
+
+app.get("/api/random-examples", async (req: Request, res: Response) => {
+  if (MANIFEST.length === 0) { res.status(503).json({ error: "Manifest not loaded" }); return; }
+  if (!KAGGLE_USER || !KAGGLE_KEY) { res.status(503).json({ error: "Kaggle credentials not configured" }); return; }
+
   const raw   = req.query["count"];
   const count = Math.min(Math.max(parseInt(typeof raw === "string" ? raw : "5") || 5, 1), 20);
+  const picks = pickRandom(MANIFEST, count);
 
-  if (!fs.existsSync(ISIC_IMAGES_PATH)) {
-    res.status(503).json({ error: "ISIC images folder not mounted" });
-    return;
+  try {
+    const results = await Promise.all(picks.map(async (imgFile) => {
+      const base    = path.parse(imgFile).name;
+      const maskFile = `${base}_segmentation.png`;
+      // pre-fetch both image and mask in parallel; mask 404 is non-fatal
+      const [, maskOk] = await Promise.allSettled([
+        getCachedFile(imgFile,  `${IMG_PREFIX}/${imgFile}`),
+        getCachedFile(maskFile, `${MASK_PREFIX}/${maskFile}`),
+      ]);
+      return {
+        imageSrc: `/api/isic-image/${encodeURIComponent(imgFile)}`,
+        gtSrc:    maskOk.status === "fulfilled" ? `/api/isic-mask/${encodeURIComponent(maskFile)}` : null,
+        label:    base,
+      };
+    }));
+    res.json(results);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: msg });
   }
-
-  const images = fs.readdirSync(ISIC_IMAGES_PATH).filter((f: string) => {
-    const ext = path.extname(f).toLowerCase();
-    return IMAGE_EXTS.has(ext) && !f.includes("_segmentation") && !f.includes("_lesion") && !f.includes("_superpixels");
-  });
-
-  if (images.length === 0) {
-    res.status(404).json({ error: "No images found in ISIC images folder" });
-    return;
-  }
-
-  const masksAvailable = fs.existsSync(ISIC_MASKS_PATH);
-
-  const results = pickRandom(images, count).map((img: string) => {
-    const base   = path.parse(img).name;
-    const gtFile = masksAvailable
-      ? [`${base}_segmentation.png`, `${base}_lesion.png`]
-          .find((f: string) => fs.existsSync(path.join(ISIC_MASKS_PATH, f)))
-      : undefined;
-    return {
-      imageSrc: `/api/isic-image/${encodeURIComponent(img)}`,
-      gtSrc:    gtFile ? `/api/isic-mask/${encodeURIComponent(gtFile)}` : null,
-      label:    base,
-    };
-  });
-
-  res.json(results);
 });
 
-/** Serves an individual image file from ISIC_IMAGES_PATH. */
+// ── File serving ──────────────────────────────────────────────────────────────
+
+function serveCache(filename: string, res: Response): void {
+  const safe = path.basename(filename);
+  const dest  = path.join(CACHE_DIR, safe);
+  if (!fs.existsSync(dest)) { res.status(404).send(); return; }
+  res.sendFile(dest);
+}
+
 app.get("/api/isic-image/:filename", (req: Request, res: Response) => {
-  const raw      = req.params["filename"];
-  const filename = decodeURIComponent(typeof raw === "string" ? raw : (raw?.[0] ?? ""));
-  if (!filename) { res.status(400).send(); return; }
-  const filePath = path.resolve(ISIC_IMAGES_PATH, filename);
-  if (!filePath.startsWith(path.resolve(ISIC_IMAGES_PATH) + path.sep)) {
-    res.status(403).send(); return;
-  }
-  if (!fs.existsSync(filePath)) { res.status(404).send(); return; }
-  res.sendFile(filePath);
+  const f = req.params["filename"];
+  if (!f) { res.status(400).send(); return; }
+  serveCache(decodeURIComponent(typeof f === "string" ? f : f[0] ?? ""), res);
 });
 
-/** Serves an individual mask file from ISIC_MASKS_PATH. */
 app.get("/api/isic-mask/:filename", (req: Request, res: Response) => {
-  const raw      = req.params["filename"];
-  const filename = decodeURIComponent(typeof raw === "string" ? raw : (raw?.[0] ?? ""));
-  if (!filename) { res.status(400).send(); return; }
-  const filePath = path.resolve(ISIC_MASKS_PATH, filename);
-  if (!filePath.startsWith(path.resolve(ISIC_MASKS_PATH) + path.sep)) {
-    res.status(403).send(); return;
-  }
-  if (!fs.existsSync(filePath)) { res.status(404).send(); return; }
-  res.sendFile(filePath);
+  const f = req.params["filename"];
+  if (!f) { res.status(400).send(); return; }
+  serveCache(decodeURIComponent(typeof f === "string" ? f : f[0] ?? ""), res);
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend is running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));

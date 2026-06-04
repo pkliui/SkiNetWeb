@@ -17,6 +17,10 @@ models/*.ckpt
 models/*.pt
 models/*.pth
 
+# isic examples — manifest is committed, downloaded images are not
+isic-examples/*
+!isic-examples/manifest.json
+
 # misc
 .DS_Store
 npm-debug.log*
