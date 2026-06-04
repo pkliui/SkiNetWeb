@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 # Preprocessing constants (from SkiNet ios_config.yaml / main_config.yaml)
 # ---------------------------------------------------------------------------
 INPUT_SIZE = 256
-MEAN = np.array([0.699, 0.556, 0.5121], dtype=np.float32)
-STD = np.array([0.1576, 0.1562, 0.1706], dtype=np.float32)
 THRESHOLD = float(os.getenv("SEGMENTATION_THRESHOLD", "0.5"))
 MODEL_PATH = os.getenv("MODEL_PATH", "/models/ios_onnx.onnx")
 
@@ -44,21 +42,39 @@ def load_model() -> None:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def preprocess(image_bytes: bytes) -> np.ndarray:
+def preprocess(image_bytes: bytes) -> tuple:
     img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
+    original_size = img.size  # (width, height)
+
+    # Center-crop to square using full height, then resize — crops left/right only
+    w, h = original_size
+    crop_left = (w - h) // 2
+    crop_left = max(crop_left, 0)
+    crop_size = min(w, h)
+    img = img.crop((crop_left, 0, crop_left + crop_size, crop_size))
     img = img.resize((INPUT_SIZE, INPUT_SIZE), resample=Image.Resampling.BILINEAR)
+
     arr = np.asarray(img, dtype=np.float32) / 255.0
-    arr = (arr - MEAN) / STD
+    per_image_mean = arr.mean(axis=(0, 1), keepdims=True)
+    per_image_std = arr.std(axis=(0, 1), keepdims=True).clip(min=1e-7)
+    arr = (arr - per_image_mean) / per_image_std
     arr = arr.transpose(2, 0, 1)
-    return arr[None, ...]
+    return arr[None, ...], original_size, crop_left
 
 
-def postprocess(output: np.ndarray) -> bytes:
-    """[1, 1, 256, 256] float32 → PNG bytes (binary mask)."""
+def postprocess(output: np.ndarray, original_size: tuple, crop_left: int) -> bytes:
+    """[1, 1, 256, 256] float32 → PNG bytes (mask placed back into original image coordinates)."""
     prob = output[0, 0]
     mask = (prob >= THRESHOLD).astype(np.uint8) * 255
+    w, h = original_size
+    crop_size = min(w, h)
+    # Resize mask back to the square crop dimensions
+    mask_crop = Image.fromarray(mask, mode="L").resize((crop_size, crop_size), resample=Image.Resampling.NEAREST)
+    # Paste into a black canvas at original dimensions so mask aligns with original image
+    canvas = Image.new("L", original_size, 0)
+    canvas.paste(mask_crop, (crop_left, 0))
     png_bytes = io.BytesIO()
-    Image.fromarray(mask, mode="L").save(png_bytes, format="PNG")
+    canvas.save(png_bytes, format="PNG")
     return png_bytes.getvalue()
 
 
@@ -73,9 +89,9 @@ async def infer(image: UploadFile = File(...)) -> Response:
 
     image_bytes = await image.read()
     try:
-        tensor = preprocess(image_bytes)
+        tensor, original_size, crop_left = preprocess(image_bytes)
         output = session.run(["mask_prob"], {"image": tensor})[0]
-        mask_png = postprocess(output)
+        mask_png = postprocess(output, original_size, crop_left)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

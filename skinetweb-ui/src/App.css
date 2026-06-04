@@ -599,6 +599,12 @@ body {
   object-fit: contain;
 }
 
+.result-card--below {
+  grid-column: 1 / -1;
+  width: 50%;
+  margin: 0 auto;
+}
+
 .result-placeholder {
   width: 100%;
   aspect-ratio: 1;
