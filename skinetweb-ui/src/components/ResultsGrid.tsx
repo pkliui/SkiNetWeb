@@ -1,85 +1,189 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 type Props = {
   previewUrl: string | null;
   resultUrl: string | null;
+  gtMaskUrl: string | null;
 };
 
-function MaskOverlay({ previewUrl, resultUrl }: { previewUrl: string; resultUrl: string }) {
+type Metrics = {
+  predAreaPct: number;
+  dice?: number;
+  iou?: number;
+  sensitivity?: number;
+  specificity?: number;
+};
+
+const CANVAS_STYLE = { width: "100%", height: "100%", objectFit: "contain" as const, borderRadius: 8 };
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+/** Rasterise a mask image to a boolean array at (w × h). */
+function maskToBinary(mask: HTMLImageElement, w: number, h: number): Uint8Array {
+  const off = document.createElement("canvas");
+  off.width = w; off.height = h;
+  const ctx = off.getContext("2d")!;
+  ctx.drawImage(mask, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const bin = new Uint8Array(w * h);
+  for (let i = 0; i < bin.length; i++) bin[i] = data[i * 4] > 128 ? 1 : 0;
+  return bin;
+}
+
+/**
+ * Draw contour lines of a binary mask onto ctx.
+ * A pixel is on the contour when it is foreground and has at least one
+ * background neighbour (4-connectivity).
+ */
+function drawContours(
+  ctx: CanvasRenderingContext2D,
+  bin: Uint8Array,
+  w: number,
+  h: number,
+  color: string,
+  lineWidth = 2,
+): void {
+  ctx.fillStyle = color;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!bin[y * w + x]) continue;
+      const isEdge =
+        (x === 0 || !bin[y * w + (x - 1)]) ||
+        (x === w - 1 || !bin[y * w + (x + 1)]) ||
+        (y === 0 || !bin[(y - 1) * w + x]) ||
+        (y === h - 1 || !bin[(y + 1) * w + x]);
+      if (isEdge) ctx.fillRect(x, y, lineWidth, lineWidth);
+    }
+  }
+}
+
+function computeMetrics(pred: Uint8Array, gt: Uint8Array | null, total: number): Metrics {
+  let predSum = 0;
+  let tp = 0, fp = 0, fn = 0, tn = 0;
+
+  for (let i = 0; i < total; i++) {
+    const p = pred[i], g = gt ? gt[i] : 0;
+    predSum += p;
+    if (gt) {
+      if (p && g)  tp++;
+      if (p && !g) fp++;
+      if (!p && g) fn++;
+      if (!p && !g) tn++;
+    }
+  }
+
+  const predAreaPct = (predSum / total) * 100;
+
+  if (!gt) return { predAreaPct };
+
+  const dice        = (2 * tp) / (2 * tp + fp + fn) || 0;
+  const iou         = tp / (tp + fp + fn) || 0;
+  const sensitivity = tp / (tp + fn) || 0;
+  const specificity = tn / (tn + fp) || 0;
+
+  return { predAreaPct, dice, iou, sensitivity, specificity };
+}
+
+function MetricBar({ metrics }: { metrics: Metrics }) {
+  const fmt = (v: number) => (v * 100).toFixed(1) + "%";
+  const items: { label: string; value: string; title: string }[] = [
+    { label: "Area", value: metrics.predAreaPct.toFixed(1) + "%", title: "Predicted lesion area as % of image" },
+    ...(metrics.dice        != null ? [{ label: "Dice",        value: fmt(metrics.dice),        title: "Dice coefficient (F1)" }] : []),
+    ...(metrics.iou         != null ? [{ label: "IoU",         value: fmt(metrics.iou),         title: "Intersection over Union (Jaccard)" }] : []),
+    ...(metrics.sensitivity != null ? [{ label: "Sensitivity", value: fmt(metrics.sensitivity), title: "Recall — fraction of GT lesion captured" }] : []),
+    ...(metrics.specificity != null ? [{ label: "Specificity", value: fmt(metrics.specificity), title: "Fraction of background correctly excluded" }] : []),
+  ];
+
+  return (
+    <div className="metric-bar">
+      {items.map(({ label, value, title }) => (
+        <div key={label} className="metric-item" title={title}>
+          <span className="metric-label">{label}</span>
+          <span className="metric-value">{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContourOverlay({
+  previewUrl, resultUrl, gtMaskUrl,
+}: { previewUrl: string; resultUrl: string; gtMaskUrl?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    let cancelled = false;
 
-    const original = new Image();
-    const mask = new Image();
-    original.src = previewUrl;
-    mask.src = resultUrl;
+    (async () => {
+      const srcs = [previewUrl, resultUrl, ...(gtMaskUrl ? [gtMaskUrl] : [])];
+      const [original, pred, gt] = await Promise.all(srcs.map(loadImage));
+      if (cancelled) return;
 
-    let loaded = 0;
-    const onLoad = () => {
-      loaded += 1;
-      if (loaded < 2) return;
-
-      canvas.width = original.naturalWidth;
-      canvas.height = original.naturalHeight;
-
+      const w = original.naturalWidth;
+      const h = original.naturalHeight;
+      canvas.width = w;
+      canvas.height = h;
       const ctx = canvas.getContext("2d")!;
+
       ctx.drawImage(original, 0, 0);
 
-      // Draw mask as a semi-transparent green tint
-      // Build a coloured mask on an offscreen canvas, then composite onto the original
-      const offscreen = document.createElement("canvas");
-      offscreen.width = original.naturalWidth;
-      offscreen.height = original.naturalHeight;
-      const off = offscreen.getContext("2d")!;
-      off.drawImage(mask, 0, 0, original.naturalWidth, original.naturalHeight);
+      const predBin = maskToBinary(pred, w, h);
+      drawContours(ctx, predBin, w, h, "#00e000");
 
-      const imageData = off.getImageData(0, 0, original.naturalWidth, original.naturalHeight);
-      const { data } = imageData;
-      for (let i = 0; i < data.length; i += 4) {
-        const isLesion = data[i] > 128;
-        data[i]     = 0;
-        data[i + 1] = isLesion ? 220 : 0;
-        data[i + 2] = 0;
-        data[i + 3] = isLesion ? 50 : 0;
+      let gtBin: Uint8Array | null = null;
+      if (gt) {
+        gtBin = maskToBinary(gt, w, h);
+        drawContours(ctx, gtBin, w, h, "#e00000");
       }
-      off.putImageData(imageData, 0, 0);
-      // drawImage respects alpha — composites the green tint on top of the original
-      ctx.drawImage(offscreen, 0, 0);
-    };
 
-    original.onload = onLoad;
-    mask.onload = onLoad;
-  }, [previewUrl, resultUrl]);
+      if (!cancelled) setMetrics(computeMetrics(predBin, gtBin, w * h));
+    })();
 
-  return <canvas ref={canvasRef} style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 8 }} />;
+    return () => { cancelled = true; };
+  }, [previewUrl, resultUrl, gtMaskUrl]);
+
+  return (
+    <>
+      <canvas ref={canvasRef} style={CANVAS_STYLE} />
+      {metrics && <MetricBar metrics={metrics} />}
+    </>
+  );
 }
 
-const ResultsGrid = ({ previewUrl, resultUrl }: Props) => {
+const ResultsGrid = ({ previewUrl, resultUrl, gtMaskUrl }: Props) => {
   if (!previewUrl) return null;
+
+  const overlayTitle = gtMaskUrl
+    ? <>Contours <span className="legend"><span className="legend-green" />predicted &nbsp;<span className="legend-red" />ground truth</span></>
+    : "Predicted contour";
 
   return (
     <div className="results-grid">
-      {/* Top row: original + overlay */}
       <div className="result-card">
         <h2>Original</h2>
         <img src={previewUrl} alt="Original lesion" />
       </div>
 
       <div className="result-card">
-        <h2>Overlay</h2>
+        <h2>{overlayTitle}</h2>
         {resultUrl ? (
-          <MaskOverlay previewUrl={previewUrl} resultUrl={resultUrl} />
+          <ContourOverlay previewUrl={previewUrl} resultUrl={resultUrl} gtMaskUrl={gtMaskUrl ?? undefined} />
         ) : (
           <div className="result-placeholder">
             <span>Press Analyse to segment</span>
           </div>
         )}
       </div>
-
-
     </div>
   );
 };

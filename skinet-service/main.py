@@ -55,11 +55,11 @@ def preprocess(image_bytes: bytes) -> tuple:
     img = img.resize((INPUT_SIZE, INPUT_SIZE), resample=Image.Resampling.BILINEAR)
 
     arr = np.asarray(img, dtype=np.float32) / 255.0
-    per_image_mean = arr.mean(axis=(0, 1), keepdims=True)
-    per_image_std = arr.std(axis=(0, 1), keepdims=True).clip(min=1e-7)
-    arr = (arr - per_image_mean) / per_image_std
-    arr = arr.transpose(2, 0, 1)
-    return arr[None, ...], original_size, crop_left
+    ISIC2017_MEAN = np.array([0.699, 0.556, 0.5121], dtype=np.float32)
+    ISIC2017_STD = np.array([0.1576, 0.1562, 0.1706], dtype=np.float32)
+    arr = (arr - ISIC2017_MEAN) / ISIC2017_STD
+    arr = arr.transpose(2, 0, 1)[np.newaxis]  # HWC → NCHW: (1, 3, 256, 256)
+    return arr, original_size, crop_left
 
 
 def postprocess(output: np.ndarray, original_size: tuple, crop_left: int) -> bytes:
