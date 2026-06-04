@@ -52,7 +52,10 @@ app.post("/api/segment", upload.single("image"), async (req: Request, res: Respo
 
 /** Download files whose ISIC IDs are not yet in the cache. */
 function ensureCached(ids: string[]): void {
-  const missing = ids.filter(id => !fs.existsSync(path.join(IMAGES_DIR, `${id}.jpg`)));
+  const missing = ids.filter(id =>
+    !fs.existsSync(path.join(IMAGES_DIR, `${id}.jpg`)) ||
+    !fs.existsSync(path.join(MASKS_DIR,  `${id}_segmentation.png`))
+  );
   if (missing.length === 0) return;
 
   // One Kaggle CLI call fetches all missing images + their masks in one shot.
