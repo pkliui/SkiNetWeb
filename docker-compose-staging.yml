@@ -9,7 +9,7 @@ services:
     depends_on:
       - frontend
       - backend
-    restart: always
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile
       context: ./nginx
@@ -21,6 +21,7 @@ services:
 
   frontend:
     image: pkliui/skinetweb:staging-frontend
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile
       context: "./skinetweb-ui"
@@ -32,6 +33,7 @@ services:
 
   backend:
     image: pkliui/skinetweb:staging-backend
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile
       context: "./skinetweb-server"
@@ -47,6 +49,7 @@ services:
 
   skinet-service:
     image: pkliui/skinetweb:staging-skinet-service
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile
       context: "./skinet-service"
