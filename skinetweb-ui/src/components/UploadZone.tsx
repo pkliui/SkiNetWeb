@@ -17,7 +17,6 @@ type Props = {
   /** Ref to the hidden <input type="file"> — owned here, forwarded from the hook.
    *  React 18 types useRef<T>(null) as RefObject<T | null>. */
   fileInputRef: React.RefObject<HTMLInputElement | null>;
-  /** Called with the chosen File whenever the user picks or drops one. */
   onFileSelect: (file: File) => void;
 };
 
