@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import ResultsGrid from "../components/ResultsGrid";
 import UploadZone from "../components/UploadZone";
 import ExampleGallery from "../examples/ExampleGallery";
 import { useSegmentation } from "../hooks/useSegmentation";
+
+const MOBILE_BREAKPOINT = 620;
 
 const HomePage = () => {
   const {
@@ -17,9 +20,20 @@ const HomePage = () => {
     onReset,
   } = useSegmentation();
 
+  const [isMobile, setIsMobile] = useState(
+    () => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   return (
     <div className="app-container">
-      <ExampleGallery onFileSelect={onFileSelect} />
+      {!isMobile && <ExampleGallery onFileSelect={onFileSelect} variant="sidebar" />}
 
       <div className="main-column">
         <h1 className="app-title">SkiNet</h1>
@@ -36,7 +50,7 @@ const HomePage = () => {
           <div className="home-steps">
             <div className="home-step">
               <span className="home-step-number">1</span>
-              <span>Upload a dermoscopy image or pick one from the examples on the left</span>
+              <span>Upload a dermoscopy image{!isMobile && " or pick one from the examples on the left"}</span>
             </div>
             <div className="home-step">
               <span className="home-step-number">2</span>
@@ -54,6 +68,8 @@ const HomePage = () => {
           fileInputRef={fileInputRef}
           onFileSelect={onFileSelect}
         />
+
+        {isMobile && <ExampleGallery onFileSelect={onFileSelect} variant="accordion" />}
 
         {selectedFile && (
           <div className="action-row">
