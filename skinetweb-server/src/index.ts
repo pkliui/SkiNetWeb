@@ -42,24 +42,11 @@ app.post("/api/segment", upload.single("image"), async (req: Request, res: Respo
   }
 });
 
-// ── Kaggle download ───────────────────────────────────────────────────────────
+// ── Random examples ───────────────────────────────────────────────────────────
 
-/** Download files whose ISIC IDs are not yet in the cache. */
-function ensureCached(ids: string[]): void {
-  const missing = ids.filter(id =>
-    !fs.existsSync(path.join(IMAGES_DIR, `${id}.jpg`)) ||
-    !fs.existsSync(path.join(MASKS_DIR,  `${id}_segmentation.png`))
-  );
-  if (missing.length === 0) return;
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg"]);
 
-  // One Kaggle CLI call fetches all missing images + their masks in one shot.
-  const pattern = missing.map(id => id.replace("ISIC_", "ISIC\\_")).join("|");
-  execSync(
-    `kaggle kernels output ${KAGGLE_KERNEL} --file-pattern "${pattern}" -p ${CACHE_DIR} -q --force`,
-    { stdio: "inherit", timeout: 120_000 }
-  );
-}
-
+/** Fisher-Yates shuffle, returns up to n elements. */
 function pickRandom<T>(arr: T[], n: number): T[] {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -69,34 +56,39 @@ function pickRandom<T>(arr: T[], n: number): T[] {
   return copy.slice(0, n);
 }
 
-// ── Random examples ───────────────────────────────────────────────────────────
-
+/**
+ * Returns N randomly chosen ISIC images from the cache, each paired with its
+ * GT mask when available. Query param: count (default 5, max 20).
+ */
 app.get("/api/random-examples", (req: Request, res: Response) => {
-  if (MANIFEST.length === 0) { res.status(503).json({ error: "Manifest not loaded" }); return; }
-
   const raw   = req.query["count"];
   const count = Math.min(Math.max(parseInt(typeof raw === "string" ? raw : "5") || 5, 1), 20);
 
-  // Pick random filenames (e.g. "ISIC_0012086.jpg") and extract IDs.
-  const picks = pickRandom<string>(MANIFEST, count);
-  const ids   = picks.map(f => path.parse(f).name);   // "ISIC_0012086"
-
-  try {
-    ensureCached(ids);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("Kaggle download failed:", msg);
-    res.status(502).json({ error: "Failed to fetch examples from Kaggle" });
+  if (!fs.existsSync(ISIC_IMAGES_PATH)) {
+    res.status(503).json({ error: "ISIC cache initialising, please retry shortly" });
     return;
   }
 
-  const results = ids.map(id => {
-    const maskFile = `${id}_segmentation.png`;
-    const hasMask  = fs.existsSync(path.join(MASKS_DIR, maskFile));
+  const images = fs.readdirSync(ISIC_IMAGES_PATH).filter((f: string) => {
+    const ext = path.extname(f).toLowerCase();
+    return IMAGE_EXTS.has(ext) && !f.includes("_segmentation") && !f.includes("_lesion") && !f.includes("_superpixels");
+  });
+
+  if (images.length === 0) {
+    res.status(404).json({ error: "No images found in ISIC cache" });
+    return;
+  }
+
+  const masksAvailable = fs.existsSync(ISIC_MASKS_PATH);
+
+  const results = pickRandom(images, count).map((img: string) => {
+    const base   = path.parse(img).name;
+    const maskFile = `${base}_segmentation.png`;
+    const hasMask  = masksAvailable && fs.existsSync(path.join(ISIC_MASKS_PATH, maskFile));
     return {
-      imageSrc: `/api/isic-image/${encodeURIComponent(`${id}.jpg`)}`,
+      imageSrc: `/api/isic-image/${encodeURIComponent(img)}`,
       gtSrc:    hasMask ? `/api/isic-mask/${encodeURIComponent(maskFile)}` : null,
-      label:    id,
+      label:    base,
     };
   });
 
@@ -109,8 +101,8 @@ app.get("/api/isic-image/:filename", (req: Request, res: Response) => {
   const raw      = req.params["filename"];
   const filename = decodeURIComponent(typeof raw === "string" ? raw : (raw?.[0] ?? ""));
   if (!filename) { res.status(400).send(); return; }
-  const filePath = path.resolve(IMAGES_DIR, filename);
-  if (!filePath.startsWith(path.resolve(IMAGES_DIR) + path.sep)) { res.status(403).send(); return; }
+  const filePath = path.resolve(ISIC_IMAGES_PATH, filename);
+  if (!filePath.startsWith(path.resolve(ISIC_IMAGES_PATH) + path.sep)) { res.status(403).send(); return; }
   if (!fs.existsSync(filePath)) { res.status(404).send(); return; }
   res.sendFile(filePath);
 });
@@ -119,8 +111,8 @@ app.get("/api/isic-mask/:filename", (req: Request, res: Response) => {
   const raw      = req.params["filename"];
   const filename = decodeURIComponent(typeof raw === "string" ? raw : (raw?.[0] ?? ""));
   if (!filename) { res.status(400).send(); return; }
-  const filePath = path.resolve(MASKS_DIR, filename);
-  if (!filePath.startsWith(path.resolve(MASKS_DIR) + path.sep)) { res.status(403).send(); return; }
+  const filePath = path.resolve(ISIC_MASKS_PATH, filename);
+  if (!filePath.startsWith(path.resolve(ISIC_MASKS_PATH) + path.sep)) { res.status(403).send(); return; }
   if (!fs.existsSync(filePath)) { res.status(404).send(); return; }
   res.sendFile(filePath);
 });
