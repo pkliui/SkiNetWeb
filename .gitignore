@@ -17,6 +17,10 @@ models/*.ckpt
 models/*.pt
 models/*.pth
 
+# secrets — Compose reads .env from repo root (Kaggle creds, etc.)
+.env
+.kaggle/
+
 # misc
 .DS_Store
 npm-debug.log*
