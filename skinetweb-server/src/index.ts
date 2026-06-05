@@ -3,28 +3,22 @@ import cors from "cors";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import os from "os";
-import { execSync } from "child_process";
-import { fileURLToPath } from "url";
+import { exec } from "child_process";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PORT           = process.env["PORT"]           || 5000;
+const INFERENCE_URL  = process.env["INFERENCE_URL"]  || "http://skinet-service:5001";
+const KAGGLE_DATASET = "kliuiev/isic-2017-test-256x256";
 
-const PORT          = process.env["PORT"]          || 5000;
-const INFERENCE_URL = process.env["INFERENCE_URL"] || "http://skinet-service:5001";
-const KAGGLE_KERNEL = "kliuiev/isic-2017-256x256";
+// Persistent cache dir — mount a named Docker volume here so the download
+// survives container restarts. Falls back to /tmp in local dev.
+const CACHE_DIR = process.env["ISIC_CACHE_DIR"] || "/isic-cache";
 
-const CACHE_DIR      = path.join(os.tmpdir(), "isic-cache");
-const KAGGLE_SUBDIR  = "isic2017_data_256";
-const IMAGES_DIR     = path.join(CACHE_DIR, KAGGLE_SUBDIR, "ISIC-2017_Test_v2_Data", "ISIC-2017_Test_v2_Data");
-const MASKS_DIR      = path.join(CACHE_DIR, KAGGLE_SUBDIR, "ISIC-2017_Test_v2_Part1_GroundTruth", "ISIC-2017_Test_v2_Part1_GroundTruth");
-const MANIFEST_PATH  = path.join(__dirname, "../../isic-manifest.json");
+// Paths produced by `kaggle datasets download kliuiev/isic-2017-test-256x256 --unzip`
+const ISIC_IMAGES_PATH = path.join(CACHE_DIR, "ISIC-2017_Test_v2_Data");
+const ISIC_MASKS_PATH  = path.join(CACHE_DIR, "ISIC-2017_Test_v2_Part1_GroundTruth");
+const CACHE_SENTINEL   = path.join(CACHE_DIR, ".cache-ready");
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
-
-const MANIFEST: string[] = (() => {
-  try { return JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf-8")); }
-  catch { console.warn("isic-manifest.json not found — gallery will be empty"); return []; }
-})();
 
 const app = express();
 app.use(cors());
@@ -131,4 +125,31 @@ app.get("/api/isic-mask/:filename", (req: Request, res: Response) => {
   res.sendFile(filePath);
 });
 
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+// Downloads the full Kaggle dataset once at startup and unzips it in place.
+// Uses a sentinel file so subsequent restarts skip the download.
+// Kaggle credentials must be supplied via KAGGLE_USERNAME + KAGGLE_KEY env vars.
+let cacheInitStarted = false;
+
+function initCacheInBackground(): void {
+  if (cacheInitStarted || fs.existsSync(CACHE_SENTINEL)) return;
+  cacheInitStarted = true;
+  console.log("Downloading ISIC dataset from Kaggle (one-time)…");
+  exec(
+    `kaggle datasets download -d ${KAGGLE_DATASET} -p ${CACHE_DIR} --unzip`,
+    { timeout: 600_000 },
+    (err: Error | null) => {
+      if (err) {
+        console.error("Kaggle download failed:", err.message);
+        cacheInitStarted = false;
+        return;
+      }
+      fs.writeFileSync(CACHE_SENTINEL, new Date().toISOString());
+      console.log("ISIC cache ready — images and GT masks available.");
+    }
+  );
+}
+
+app.listen(PORT, () => {
+  console.log(`Backend is running on port ${PORT}`);
+  initCacheInBackground();
+});

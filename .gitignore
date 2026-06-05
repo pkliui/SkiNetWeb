@@ -17,9 +17,9 @@ models/*.ckpt
 models/*.pt
 models/*.pth
 
-# isic examples — manifest is committed, downloaded images are not
-isic-examples/*
-!isic-examples/manifest.json
+# secrets — Compose reads .env from repo root (Kaggle creds, etc.)
+.env
+.kaggle/
 
 # misc
 .DS_Store
