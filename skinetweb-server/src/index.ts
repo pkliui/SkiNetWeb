@@ -3,11 +3,22 @@ import cors from "cors";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import { exec } from "child_process";
 
-const PORT             = process.env["PORT"]             || 5000;
-const INFERENCE_URL    = process.env["INFERENCE_URL"]    || "http://skinet-service:5001";
-const ISIC_IMAGES_PATH = process.env["ISIC_IMAGES_PATH"] || "/isic-images";
-const ISIC_MASKS_PATH  = process.env["ISIC_MASKS_PATH"]  || "/isic-masks";
+const PORT           = process.env["PORT"]           || 5000;
+const INFERENCE_URL  = process.env["INFERENCE_URL"]  || "http://skinet-service:5001";
+const KAGGLE_DATASET = "kliuiev/isic-2017-test-256x256";
+
+// Persistent cache dir — mount a named Docker volume here so the download
+// survives container restarts. Falls back to /tmp in local dev.
+const CACHE_DIR = process.env["ISIC_CACHE_DIR"] || "/isic-cache";
+
+// Paths produced by `kaggle datasets download kliuiev/isic-2017-test-256x256 --unzip`
+const ISIC_IMAGES_PATH = path.join(CACHE_DIR, "ISIC-2017_Test_v2_Data");
+const ISIC_MASKS_PATH  = path.join(CACHE_DIR, "ISIC-2017_Test_v2_Part1_GroundTruth");
+const CACHE_SENTINEL   = path.join(CACHE_DIR, ".cache-ready");
+
+fs.mkdirSync(CACHE_DIR, { recursive: true });
 
 const app = express();
 app.use(cors());
@@ -123,6 +134,31 @@ app.get("/api/isic-mask/:filename", (req: Request, res: Response) => {
   res.sendFile(filePath);
 });
 
+// Downloads the full Kaggle dataset once at startup and unzips it in place.
+// Uses a sentinel file so subsequent restarts skip the download.
+// Kaggle credentials must be supplied via KAGGLE_USERNAME + KAGGLE_KEY env vars.
+let cacheInitStarted = false;
+
+function initCacheInBackground(): void {
+  if (cacheInitStarted || fs.existsSync(CACHE_SENTINEL)) return;
+  cacheInitStarted = true;
+  console.log("Downloading ISIC dataset from Kaggle (one-time)…");
+  exec(
+    `kaggle datasets download -d ${KAGGLE_DATASET} -p ${CACHE_DIR} --unzip`,
+    { timeout: 600_000 },
+    (err: Error | null) => {
+      if (err) {
+        console.error("Kaggle download failed:", err.message);
+        cacheInitStarted = false;
+        return;
+      }
+      fs.writeFileSync(CACHE_SENTINEL, new Date().toISOString());
+      console.log("ISIC cache ready — images and GT masks available.");
+    }
+  );
+}
+
 app.listen(PORT, () => {
   console.log(`Backend is running on port ${PORT}`);
+  initCacheInBackground();
 });
