@@ -326,6 +326,46 @@ output  = conv2 + merged          # identity shortcut`}</pre>
       </p>
     </section>
 
+    {/* ── Model Selection ────────────────────────────────────────────── */}
+    <section className="doc-section">
+      <h2>Model Selection</h2>
+      <p>
+        The figures below summarise the 10-seed tie-break between the two top-ranked
+        configurations (classical/He2 vs classical/attention-gate).
+      </p>
+
+      <h3>Figure 1 — Paired slope graph</h3>
+      <p>
+        Each line connects one seed's val Dice under both configurations. The slope
+        direction shows which performed better for that seed.
+      </p>
+      <div style={{ textAlign: "center", margin: "0.75rem 0 1.5rem" }}>
+        <img
+          src="https://pkliui.github.io/SkiNet/_static/model_selection/E2_fig1_paired_slopegraph.png"
+          alt="Paired slope graph comparing classical/He2 and classical/attention-gate val Dice across 10 seeds"
+          style={{ maxWidth: "100%", width: "680px", borderRadius: "6px", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}
+        />
+        <p style={{ fontSize: "0.85rem", color: "#666", marginTop: "0.5rem" }}>
+          Fig 1. Per-seed val Dice for the two top-ranked configurations across the 10-seed tie-break.
+        </p>
+      </div>
+
+      <h3>Figure 2 — Forest plot of paired differences</h3>
+      <p>
+        Forest plot
+      </p>
+      <div style={{ textAlign: "center", margin: "0.75rem 0 1.5rem" }}>
+        <img
+          src="https://pkliui.github.io/SkiNet/_static/model_selection/E2_fig2_forest_paired_diff.png"
+          alt="Forest plot of per-seed Dice differences between classical/He2 and classical/attention-gate"
+          style={{ maxWidth: "100%", width: "680px", borderRadius: "6px", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}
+        />
+        <p style={{ fontSize: "0.85rem", color: "#666", marginTop: "0.5rem" }}>
+          Fig 2. Forest plot of paired Dice differences (He2 − attention-gate) across 10 seeds.
+        </p>
+      </div>
+    </section>
+
     {/* ── Training setup ─────────────────────────────────────────────── */}
     <section className="doc-section">
       <h2>Training setup</h2>
