@@ -455,6 +455,14 @@ output  = conv2 + merged          # identity shortcut`}</pre>
       </ol>
     </section>
 
+const NetworkDesignPage = () => (
+  <div className="docs-frame-container">
+    <iframe
+      src={NETWORK_DESIGN_URL}
+      title="SkiNet Network Design"
+      className="docs-frame"
+      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+    />
   </div>
 );
 

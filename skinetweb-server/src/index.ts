@@ -124,6 +124,18 @@ let cacheInitStarted = false;
 
 function initCacheInBackground(): void {
   if (cacheInitStarted || fs.existsSync(CACHE_SENTINEL)) return;
+
+  // Fail loud, not silent: without credentials the Kaggle CLI errors out and the
+  // gallery would just return 503 with no hint why. Surface the real cause.
+  if (!process.env["KAGGLE_USERNAME"] || !process.env["KAGGLE_KEY"]) {
+    console.error(
+      "⚠ KAGGLE_USERNAME / KAGGLE_KEY not set — skipping ISIC download. " +
+      "The examples gallery will be empty (503). Add them to the .env next to " +
+      "docker-compose so Compose passes them into this container."
+    );
+    return;
+  }
+
   cacheInitStarted = true;
   console.log("Downloading ISIC dataset from Kaggle (one-time)…");
   exec(
