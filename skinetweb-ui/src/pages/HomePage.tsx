@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import ResultsGrid from "../components/ResultsGrid";
+import { useCallback, useEffect, useState } from "react";
+import CaseReportPanel from "../components/CaseReportPanel";
+import ResultsGrid, { type Metrics } from "../components/ResultsGrid";
 import UploadZone from "../components/UploadZone";
 import ExampleGallery from "../examples/ExampleGallery";
 import { useSegmentation } from "../hooks/useSegmentation";
@@ -23,6 +24,22 @@ const HomePage = () => {
   const [isMobile, setIsMobile] = useState(
     () => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
   );
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+
+  const handleFileSelect = useCallback((fileOrFiles: File | File[]) => {
+    setMetrics(null);
+    onFileSelect(fileOrFiles);
+  }, [onFileSelect]);
+
+  const handleSubmit = useCallback(async () => {
+    setMetrics(null);
+    await onSubmit();
+  }, [onSubmit]);
+
+  const handleReset = useCallback(() => {
+    setMetrics(null);
+    onReset();
+  }, [onReset]);
 
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
@@ -33,7 +50,7 @@ const HomePage = () => {
 
   return (
     <div className="app-container">
-      {!isMobile && <ExampleGallery onFileSelect={onFileSelect} variant="sidebar" />}
+      {!isMobile && <ExampleGallery onFileSelect={handleFileSelect} variant="sidebar" />}
 
       <div className="main-column">
         <h1 className="app-title">SkiNet</h1>
@@ -66,17 +83,17 @@ const HomePage = () => {
         <UploadZone
           selectedFile={selectedFile}
           fileInputRef={fileInputRef}
-          onFileSelect={onFileSelect}
+          onFileSelect={handleFileSelect}
         />
 
-        {isMobile && <ExampleGallery onFileSelect={onFileSelect} variant="accordion" />}
+        {isMobile && <ExampleGallery onFileSelect={handleFileSelect} variant="accordion" />}
 
         {selectedFile && (
           <div className="action-row">
-            <button className="btn-primary" onClick={onSubmit} disabled={isLoading}>
+            <button className="btn-primary" onClick={handleSubmit} disabled={isLoading}>
               {isLoading ? "Analysing…" : "Analyse"}
             </button>
-            <button className="btn-secondary" onClick={onReset} disabled={isLoading}>
+            <button className="btn-secondary" onClick={handleReset} disabled={isLoading}>
               Reset
             </button>
           </div>
@@ -84,7 +101,14 @@ const HomePage = () => {
 
         {error && <p className="error-message">{error}</p>}
 
-        <ResultsGrid previewUrl={previewUrl} resultUrl={resultUrl} gtMaskUrl={gtMaskUrl} />
+        <ResultsGrid
+          previewUrl={previewUrl}
+          resultUrl={resultUrl}
+          gtMaskUrl={gtMaskUrl}
+          onMetricsChange={setMetrics}
+        />
+
+        <CaseReportPanel selectedFile={selectedFile} metrics={metrics} resultReady={Boolean(resultUrl)} />
       </div>
     </div>
   );

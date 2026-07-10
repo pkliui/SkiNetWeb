@@ -815,3 +815,140 @@ body {
   text-align: center;
   padding: 8px;
 }
+
+
+/* AI case report */
+.case-report-panel {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #d6def8;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  padding: 18px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.case-report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.case-report-header h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: #2757dd;
+}
+
+.case-report-header p {
+  margin: 0;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.case-report-placeholder {
+  border: 1px dashed #c7d4ff;
+  border-radius: 8px;
+  color: #667;
+  background: #f6f8ff;
+  padding: 14px;
+  font-size: 14px;
+}
+
+.case-report-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.case-report-summary,
+.prompt-trace {
+  grid-column: 1 / -1;
+}
+
+.case-report-summary {
+  background: #f6f8ff;
+  border: 1px solid #d6def8;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.case-report-summary p {
+  margin: 10px 0 0;
+  color: #333;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.case-report-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  border-radius: 999px;
+  background: #183b8f;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 9px;
+}
+
+.case-report-section {
+  border: 1px solid #edf0fa;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.case-report-section h3 {
+  margin: 0 0 8px;
+  color: #333;
+  font-size: 15px;
+}
+
+.case-report-section ul,
+.prompt-trace ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #444;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.case-report-section li + li,
+.prompt-trace li + li {
+  margin-top: 6px;
+}
+
+.prompt-trace {
+  border-top: 1px solid #edf0fa;
+  padding-top: 12px;
+}
+
+.prompt-trace summary {
+  cursor: pointer;
+  color: #2757dd;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.prompt-trace ul {
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .case-report-header {
+    flex-direction: column;
+  }
+
+  .case-report-header .btn-primary {
+    width: 100%;
+  }
+
+  .case-report-content {
+    grid-template-columns: 1fr;
+  }
+}
