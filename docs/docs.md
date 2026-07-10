@@ -537,7 +537,7 @@ services:
 - Run the docker compose files
 
 ```bash
-docker compose -f docker-compose-dev.yml up --build
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 - We should be able to see our application fully functional under http://localhost:8000.
