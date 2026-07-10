@@ -6,13 +6,14 @@ POST /infer  — accepts a multipart image, returns a PNG segmentation mask.
 
 import io
 import os
-
 import numpy as np
 import onnxruntime as ort
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from PIL import Image, ImageOps
 import logging
+
+from reporting import CaseReport, CaseReportRequest, generate_case_report
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,11 @@ async def infer(image: UploadFile = File(...)) -> Response:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return Response(content=mask_png, media_type="image/png")
+
+
+@app.post("/case-report", response_model=CaseReport)
+async def case_report(request: CaseReportRequest) -> CaseReport:
+    return await generate_case_report(request)
 
 
 @app.get("/health")

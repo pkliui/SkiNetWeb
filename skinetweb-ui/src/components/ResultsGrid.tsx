@@ -4,9 +4,10 @@ type Props = {
   previewUrl: string | null;
   resultUrl: string | null;
   gtMaskUrl: string | null;
+  onMetricsChange?: (metrics: Metrics | null) => void;
 };
 
-type Metrics = {
+export type Metrics = {
   predAreaPct: number;
   dice?: number;
   iou?: number;
@@ -115,7 +116,13 @@ function MetricBar({ metrics }: { metrics: Metrics }) {
 
 function ContourOverlay({
   previewUrl, resultUrl, gtMaskUrl,
-}: { previewUrl: string; resultUrl: string; gtMaskUrl?: string }) {
+  onMetricsChange,
+}: {
+  previewUrl: string;
+  resultUrl: string;
+  gtMaskUrl?: string;
+  onMetricsChange?: (metrics: Metrics | null) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
 
@@ -146,11 +153,18 @@ function ContourOverlay({
         drawContours(ctx, gtBin, w, h, "#e00000");
       }
 
-      if (!cancelled) setMetrics(computeMetrics(predBin, gtBin, w * h));
+      const nextMetrics = computeMetrics(predBin, gtBin, w * h);
+      if (!cancelled) {
+        setMetrics(nextMetrics);
+        onMetricsChange?.(nextMetrics);
+      }
     })();
 
-    return () => { cancelled = true; };
-  }, [previewUrl, resultUrl, gtMaskUrl]);
+    return () => {
+      cancelled = true;
+      onMetricsChange?.(null);
+    };
+  }, [previewUrl, resultUrl, gtMaskUrl, onMetricsChange]);
 
   return (
     <>
@@ -160,7 +174,7 @@ function ContourOverlay({
   );
 }
 
-const ResultsGrid = ({ previewUrl, resultUrl, gtMaskUrl }: Props) => {
+const ResultsGrid = ({ previewUrl, resultUrl, gtMaskUrl, onMetricsChange }: Props) => {
   if (!previewUrl) return null;
 
   const overlayTitle = gtMaskUrl
@@ -177,7 +191,12 @@ const ResultsGrid = ({ previewUrl, resultUrl, gtMaskUrl }: Props) => {
       <div className="result-card">
         <h2>{overlayTitle}</h2>
         {resultUrl ? (
-          <ContourOverlay previewUrl={previewUrl} resultUrl={resultUrl} gtMaskUrl={gtMaskUrl ?? undefined} />
+          <ContourOverlay
+            previewUrl={previewUrl}
+            resultUrl={resultUrl}
+            gtMaskUrl={gtMaskUrl ?? undefined}
+            onMetricsChange={onMetricsChange}
+          />
         ) : (
           <div className="result-placeholder">
             <span>Press Analyse to segment</span>
