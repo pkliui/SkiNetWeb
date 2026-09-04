@@ -52,7 +52,7 @@ jobs:
           OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
           MISTRAL_API_KEY=${MISTRAL_API_KEY}
           EOF
-          ./build-env.sh
+          bash build-env.sh
 
       - name: Containers before deploy
         run: docker ps -a
