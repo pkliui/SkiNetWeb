@@ -12,6 +12,22 @@ jobs:
       - name: Checkout code from the github repo
         uses: actions/checkout@v2
 
+      - name: Build .env from tracked config + GitHub Secrets
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: |
+          set -eu
+          cat > .env.secrets << EOF
+          KAGGLE_USERNAME=${KAGGLE_USERNAME}
+          KAGGLE_KEY=${KAGGLE_KEY}
+          OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+          MISTRAL_API_KEY=${MISTRAL_API_KEY}
+          EOF
+          ./build-env.sh
+
       - name: Build Docker images for frontend, backend, nginx and skinet-service
         run: |
 
