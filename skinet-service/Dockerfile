@@ -4,6 +4,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py reporting.py ./
+COPY main.py logging_setup.py settings.py ./
+COPY reporting/ ./reporting/
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5001"]

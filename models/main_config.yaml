@@ -1,0 +1,124 @@
+GENERAL_CONFIG:
+  experiment_type: "segmentation"
+  model: "UNET2D_MODEL"
+  dataset: "ISIC2017_DATASET"
+DATA_CONFIG:
+  local_data_root: "/mnt/data/"  # in-container data mount (CONTAINER_MOUNT_PATH in on_start_gpu.sh)
+  azure_data: False
+  azure_blob_mount_point: "/mnt/data/"
+  split_random_seed: 100
+TRANSFORM_CONFIG:
+  seed_value: 100
+  crop:
+    crop_apply: False
+    crop_type: "random_resized_crop"
+    size: [256, 256]
+    scale: [0.8, 1.0]
+  spatial_augmentation:
+    square_symmetry_apply: True
+    square_symmetry_p: 0.5
+    affine_apply: True
+    affine_scale: [0.8, 1.0]
+    affine_translate_percent: {"x": [-0.05, 0.05], "y": [-0.05, 0.05]}
+    affine_rotate: [-20, 20]
+    affine_shear: {"x": [0, 0], "y": [0, 0]}
+    perspective_apply: True
+    perspective_scale: [0.05, 0.1]
+    perspective_p: 0.2
+    elastic_apply: True
+    elastic_alpha: 120
+    elastic_sigma: 10
+    elastic_p: 0.1
+  normalization_mode: "standard"
+  normalization_mean: [0.699, 0.556, 0.5121]
+  normalization_std:  [0.1576, 0.1562, 0.1706]
+  photometric_augmentation:
+    color_jitter_apply: True
+    color_jitter_brightness: 0.2
+    color_jitter_contrast: 0.2
+    color_jitter_saturation: 0.1
+    color_jitter_hue: 0.02
+    color_jitter_p: 0.3
+    gaussian_blur_apply: True
+    gaussian_blur_sigma_limit: [0.5, 2.0]
+    gaussian_blur_p: 0.2
+    gaussian_noise_apply: True
+    gaussian_noise_std_range: [0.01, 0.05]
+    gaussian_noise_p: 0.2
+MODEL_CONFIG:
+  validate_forward: false
+  debug_forward: false
+  encoder_residual_mode: "classical"   # "classical", "he2" | "se"
+  merge_residual_mode: "attention_gate"     # MUST match checkpoint (E4 = classical+attention_gate)
+  se_reduction: 16  # SE bottleneck ratio; ignored when encoder_residual_mode != "se"
+SWEEP_CONFIG:
+  monitor: "val_best_dice_at_threshold"
+  direction: "maximize"
+  experiment_name: "E1-isic2017-unet2d-model-lr-1seed"
+  lr: [3e-4]  # fixed from E1 LR search; single value means LR is not varied in this sweep
+  weight_decay: [0.0]
+  num_workers: [2]
+  prefetch_factor: [4]
+  batch_size: [8] # 8 with 2 GPUS = 16 on 1 GPU
+TRAIN_CONFIG:
+  log_dir: "lightning_logs"
+  experiment_name: "E4-isic2017-unet2d-test-seed102"
+  run_test_after_fit: false
+  test_on_val_split: false
+  use_torch_compile: true  # MUST match checkpoint: E4 ckpt keys carry torch.compile's _orig_mod. prefix
+  torch_compile_backend: eager  # eager avoids nvcc dependency; still wraps model so _orig_mod. keys match
+  batch_size: 8 # per-GPU; effective = 8x2 = 16
+  num_workers: 2 # t4 x2 GPU
+  pin_memory: true
+  prefetch_factor: 4
+  cache_in_ram: false  # set false for datasets too large to fit in RAM
+  loss_name: "bce_dice"
+  optimizer_name: "adam"
+  lr: 3e-4 # as per effective batch size
+  weight_decay: 0.0
+  optimal_threshold: 0.5
+  seed: 100
+  deterministic: false
+  max_epochs: 100
+  accelerator: "auto"
+  devices: 1
+  strategy: "auto"
+  log_every_n_steps: 10
+  check_val_every_n_epoch: 1
+  num_sanity_val_steps: 0
+  use_mlflow_logger: true
+  use_litlogger_logger: false
+  use_early_stopping: false
+  use_checkpoint: true
+  early_stopping_config:
+    mode: "max"
+    min_delta: 0.005
+    patience: 30
+    strict: true
+    check_finite: true
+    stopping_threshold:
+    divergence_threshold:
+  checkpoint_config:
+    mode: "max"
+    save_top_k: 1
+    save_last: false
+    filename: "epoch{epoch:03d}"
+  litlogger_config:
+    teamspace: "l-pkliui"
+    log_model: false
+    save_logs: false
+    checkpoint_name:
+  mlflow_config:
+    fallback_to_local_mlflow: false
+    tracking_uri: "http://127.0.0.1:5000"
+    log_model: false
+    log_model_summary: true
+  use_lr_scheduler: false
+  scheduler_type: "cosine_annealing"   # "reduce_on_plateau" | "cosine_annealing"
+  lr_scheduler_config:
+    mode: "max"
+    patience: 3
+    factor: 0.5
+  cosine_annealing_config:
+    T_max:      # null → resolved to max_epochs at runtime
+    eta_min: 1.0e-6

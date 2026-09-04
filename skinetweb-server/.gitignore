@@ -1,3 +1,5 @@
 node_modules
 # Keep environment variables out of version control
 .env
+# Local ISIC cache for `npm run dev` outside Docker (see nodemon.json)
+/isic-cache

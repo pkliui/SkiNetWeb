@@ -24,3 +24,9 @@ models/*.pth
 # misc
 .DS_Store
 npm-debug.log*
+__pycache__/
+*.pyc
+skinetweb-ui/public/examples/isic/*.jpg
+skinetweb-ui/public/examples/isic/*.png
+skinetweb-ui/public/examples/*.bmp
+skinetweb-ui/public/model_selection/*.png

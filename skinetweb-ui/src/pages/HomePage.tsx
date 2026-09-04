@@ -101,6 +101,14 @@ const HomePage = () => {
 
         {error && <p className="error-message">{error}</p>}
 
+        {/*
+          ResultsGrid and CaseReportPanel are siblings that both need `metrics`
+          (ResultsGrid computes it, CaseReportPanel sends it in a report request),
+          so it's lifted up into this component's state. `onMetricsChange={setMetrics}`
+          is a callback prop: ResultsGrid calls it with each new value, which is
+          literally `setMetrics` running in this scope. See "lifting state up" in
+          docs/case-report-request-path.md for the full trace.
+        */}
         <ResultsGrid
           previewUrl={previewUrl}
           resultUrl={resultUrl}
