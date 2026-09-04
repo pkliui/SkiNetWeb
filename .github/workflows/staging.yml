@@ -26,7 +26,7 @@ jobs:
           OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
           MISTRAL_API_KEY=${MISTRAL_API_KEY}
           EOF
-          ./build-env.sh
+          bash build-env.sh
 
       - name: Build Docker images for frontend, backend, nginx and skinet-service
         run: |
