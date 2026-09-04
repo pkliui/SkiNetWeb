@@ -31,7 +31,7 @@ import { Router, type Request, type Response } from "express";
 import { MAX_CASE_REPORT_CONCURRENCY, MAX_SEGMENT_CONCURRENCY } from "../config.js";
 import { createConcurrencyMiddleware } from "../middleware/concurrency.js";
 import { parseImageUpload } from "../middleware/upload.js";
-import { createCaseReport, segmentImage } from "../services/inferenceService.js";
+import { createCaseReport, getProviderStatus, segmentImage } from "../services/inferenceService.js";
 import { sendServiceError } from "../utils/errors.js";
 
 export const inferenceRouter = Router();
@@ -64,6 +64,19 @@ inferenceRouter.post("/api/segment", limitSegmentConcurrency, parseImageUpload, 
   }
 });
 
+/**
+ * Case report endpoint.
+ *
+ * `app.use(express.json({ limit: "1mb" }))`  parses the
+   request body as JSON and attaches the result as `req.body`.
+   That is why  `req.body` is already available here as a plain JS object.
+ * `limitCaseReportConcurrency` runs first and can short-circuit with a 429
+ * before this handler body ever executes. Otherwise `createCaseReport`
+ * makes a brand-new outbound request to FastAPI's `/case-report` — a
+ * separate route match in a separate route table, not caused by this one —
+ * and this handler awaits it, forwarding the body as-is. Full path traced
+ * in `docs/case-report-request-path.md`.
+ */
 inferenceRouter.post("/api/case-report", limitCaseReportConcurrency, async (req: Request, res: Response) => {
   try {
     res.json(await createCaseReport(req.body));
@@ -71,6 +84,26 @@ inferenceRouter.post("/api/case-report", limitCaseReportConcurrency, async (req:
     sendServiceError(res, error, {
       timedOut: "Case report service timed out",
       unavailable: "Case report service unavailable",
+    });
+  }
+});
+
+/**
+ * Provider readiness check, polled by the UI on load to show whether the
+ * LLM is configured and reachable before the user spends time on a report
+ * that will only degrade to the deterministic fallback.
+ *
+ * Deliberately not behind `limitCaseReportConcurrency`: it's a cheap
+ * reachability probe, not a report generation, and gating it on the same
+ * slot would let it starve or be starved by real report requests.
+ */
+inferenceRouter.get("/api/case-report/status", async (_req: Request, res: Response) => {
+  try {
+    res.json(await getProviderStatus());
+  } catch (error) {
+    sendServiceError(res, error, {
+      timedOut: "Provider status check timed out",
+      unavailable: "Provider status check unavailable",
     });
   }
 });

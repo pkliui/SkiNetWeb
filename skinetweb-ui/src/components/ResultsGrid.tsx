@@ -31,6 +31,11 @@ function maskToBinary(mask: HTMLImageElement, w: number, h: number): Uint8Array 
   const off = document.createElement("canvas");
   off.width = w; off.height = h;
   const ctx = off.getContext("2d")!;
+  // w/h are the caller's EXIF-corrected original.naturalWidth/naturalHeight (see
+  // ContourOverlay below), which only match the backend mask's own dimensions
+  // because postprocess (skinet-service/main.py) sized its canvas from the same
+  // EXIF-corrected orientation. drawImage doesn't validate that — a mismatch here
+  // silently stretches the mask into the wrong aspect ratio instead of erroring.
   ctx.drawImage(mask, 0, 0, w, h);
   const { data } = ctx.getImageData(0, 0, w, h);
   const bin = new Uint8Array(w * h);

@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile
       context: "./skinetweb-ui"
     ports:
-      - "3000"
+      - "127.0.0.1:3000:3000" # loopback-only: local debugging (intentionally bypasses nginx from the host); not reachable off-host
     mem_reservation: "500M"
     mem_limit: "2000M"
     memswap_limit: 2G
@@ -36,17 +36,14 @@ services:
       dockerfile: Dockerfile
       context: "./skinetweb-server"
     ports:
-      - "5000"
+      - "127.0.0.1:5000:5000" # loopback-only: local debugging (intentionally bypasses nginx from the host); not reachable off-host
     environment:
       - INFERENCE_URL=http://skinet-service:5001
       - KAGGLE_USERNAME=${KAGGLE_USERNAME}
       - KAGGLE_KEY=${KAGGLE_KEY}
       - ISIC_CACHE_DIR=/isic-cache
-      - MAX_SEGMENT_CONCURRENCY=1        # t3.small: no memory headroom for concurrent inference
-      - MAX_CASE_REPORT_CONCURRENCY=5
-      - SEGMENT_TIMEOUT_MS=5000         # real ISIC image, 5 runs, max 1.65s
-      - CASE_REPORT_TIMEOUT_MS=30000     # TODO: likely too tight for LLM calls, pending real test
-      - MAX_UPLOAD_BYTES=10485760
+      - MAX_CASE_REPORT_CONCURRENCY=${MAX_CASE_REPORT_CONCURRENCY:?required, set in .env} # shared with skinet-service below; both must enforce the same limit
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:?required, set in .env} # shared with skinet-service below; both must enforce the same limit
     volumes:
       - isic-cache:/isic-cache
     depends_on:
@@ -61,19 +58,19 @@ services:
       dockerfile: Dockerfile
       context: "./skinet-service"
     ports:
-      - "5001"
+      - "127.0.0.1:5001:5001" # loopback-only: local debugging (intentionally bypasses nginx from the host); not reachable off-host
     environment:
-      - MODEL_PATH=/models/ios_onnx.onnx
-      - SEGMENTATION_THRESHOLD=0.5
-      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
-      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT:-}
-      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-02-15-preview}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
-      - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-20}
-      - LLM_MAX_RETRIES=${LLM_MAX_RETRIES:-2}
-      - LLM_MAX_OUTPUT_TOKENS=${LLM_MAX_OUTPUT_TOKENS:-700}
+      - CONFIG_PATH=${CONFIG_PATH:?required, set in .env}
+      - MODEL_PATH=${MODEL_PATH:?required, set in .env}
+      - INFER_SLOW_WARN_SECONDS=${INFER_SLOW_WARN_SECONDS:?required, set in .env}
+      - MAX_CASE_REPORT_CONCURRENCY=${MAX_CASE_REPORT_CONCURRENCY:?required, set in .env} # shared with backend above; both must enforce the same limit
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:?required, set in .env} # shared with backend above; both must enforce the same limit
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - MISTRAL_MODEL=${MISTRAL_MODEL:-mistral-medium-2604}
+      - MISTRAL_BASE_URL=${MISTRAL_BASE_URL:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-}
     volumes:
       - ./models:/models:ro
     mem_reservation: "500M"

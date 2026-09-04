@@ -1,16 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCaseReport } from "../hooks/useCaseReport";
+import { useProviderStatus } from "../hooks/useProviderStatus";
+import { describeFallbackReason } from "../types/fallbackReason";
+import { describeProviderStatusReason, providerStatusTone } from "../types/providerStatus";
 import type { Metrics } from "./ResultsGrid";
-
-type CaseReport = {
-  summary: string;
-  observations: string[];
-  qualityChecks: string[];
-  promptTrace: {
-    mode: "llm" | "deterministic-fallback";
-    model: string;
-    retrievedContext: string[];
-  };
-};
 
 type Props = {
   selectedFile: File | null;
@@ -18,59 +10,43 @@ type Props = {
   resultReady: boolean;
 };
 
+// Keyed by ProviderStatusTone; the badge shown next to the panel title
+// before the user generates a report.
+const PROVIDER_STATUS_LABEL = {
+  ready: "LLM ready",
+  degraded: "LLM reachable",
+  down: "LLM unavailable",
+} as const;
+
 const CaseReportPanel = ({ selectedFile, metrics, resultReady }: Props) => {
-  const [report, setReport] = useState<CaseReport | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const canGenerate = Boolean(selectedFile && metrics && resultReady && !isLoading);
-
-  useEffect(() => {
-    setReport(null);
-    setError(null);
-  }, [selectedFile, resultReady]);
-
-  const generateReport = async () => {
-    if (!selectedFile || !metrics) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/case-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: selectedFile.name,
-          imageType: selectedFile.type,
-          imageSizeBytes: selectedFile.size,
-          metrics,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Report generation failed");
-      setReport(await response.json() as CaseReport);
-    } catch {
-      setError("Could not generate the AI report. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { report, error, isLoading, canGenerate, generateReport } = useCaseReport({
+    selectedFile,
+    metrics,
+    resultReady,
+  });
+  const { status: providerStatus, isChecking: isCheckingProvider } = useProviderStatus();
 
   return (
     <section className="case-report-panel" aria-label="AI case report">
       <div className="case-report-header">
         <div>
-          <h2>AI Segmentation Report</h2>
-          <p>Grounded LLM summary with prompt context, quality gates, and safety controls.</p>
+          <h2>LLM Segmentation Summary</h2>
+          {!isCheckingProvider && providerStatus && (
+            <span
+              className={`provider-status-badge provider-status-badge--${providerStatusTone(providerStatus)}`}
+              title={providerStatus.reason ? describeProviderStatusReason(providerStatus.reason) : undefined}
+            >
+              {PROVIDER_STATUS_LABEL[providerStatusTone(providerStatus)]}
+            </span>
+          )}
         </div>
         <button className="btn-primary" onClick={generateReport} disabled={!canGenerate}>
-          {isLoading ? "Generating..." : "Generate report"}
+          {isLoading ? "Generating..." : "Generate LLM summary"}
         </button>
       </div>
 
       {!resultReady && (
-        <div className="case-report-placeholder">Run segmentation first to unlock the grounded report workflow.</div>
+        <div className="case-report-placeholder">Run segmentation first to unlock the report workflow.</div>
       )}
 
       {error && <p className="error-message">{error}</p>}
@@ -78,10 +54,22 @@ const CaseReportPanel = ({ selectedFile, metrics, resultReady }: Props) => {
       {report && (
         <div className="case-report-content">
           <div className="case-report-summary">
-            <span className="case-report-badge">
-              {report.promptTrace.mode === "llm" ? "LLM" : "Fallback"} · {report.promptTrace.model}
+            <span
+              className={
+                report.reportMetadata.mode === "llm"
+                  ? "case-report-badge"
+                  : "case-report-badge case-report-badge--fallback"
+              }
+            >
+              {report.reportMetadata.mode === "llm" ? "LLM" : "Fallback"} · {report.reportMetadata.provider} ·{" "}
+              {report.reportMetadata.model} · {report.reportMetadata.latencyMs}ms
             </span>
             <p>{report.summary}</p>
+            {report.reportMetadata.fallbackReason && (
+              <p className="case-report-fallback" role="status">
+                {describeFallbackReason(report.reportMetadata.fallbackReason)}
+              </p>
+            )}
           </div>
 
           <ReportList title="Observations" items={report.observations} />
@@ -90,7 +78,7 @@ const CaseReportPanel = ({ selectedFile, metrics, resultReady }: Props) => {
           <details className="prompt-trace">
             <summary>Prompt grounding</summary>
             <ul>
-              {report.promptTrace.retrievedContext.map((item) => (
+              {report.reportMetadata.context.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>

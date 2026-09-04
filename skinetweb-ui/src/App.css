@@ -851,6 +851,42 @@ body {
   line-height: 1.5;
 }
 
+.provider-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px 3px 8px;
+}
+
+.provider-status-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.provider-status-badge--ready {
+  color: #6dcc00;
+  background: #e6f6ec;
+}
+
+/* Reachable but a precision check (model-list confirmation) didn't clear —
+   distinct from --down so a caveat doesn't read as an outage. */
+.provider-status-badge--degraded {
+  color: #e6c700;
+  background: #fdf1de;
+}
+
+.provider-status-badge--down {
+  color: #de918d;
+  background: #fdeceb;
+}
+
 .case-report-placeholder {
   border: 1px dashed #c7d4ff;
   border-radius: 8px;
@@ -885,9 +921,17 @@ body {
   line-height: 1.6;
 }
 
+.case-report-summary .case-report-fallback {
+  color: #8a5200;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .case-report-badge {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
   max-width: 100%;
   border-radius: 999px;
   background: #183b8f;
@@ -895,6 +939,13 @@ body {
   font-size: 12px;
   font-weight: 700;
   padding: 5px 9px;
+}
+
+/* A templated report must not be mistakable for a model-generated one at a
+   glance. Amber matches .case-report-fallback below, so the badge and the
+   explanation under it read as one note rather than two unrelated signals. */
+.case-report-badge--fallback {
+  background: #8a5200;
 }
 
 .case-report-section {

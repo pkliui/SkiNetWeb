@@ -15,7 +15,7 @@
  * of constructing HTTP requests directly.
  */
 
-import { CASE_REPORT_TIMEOUT_MS, INFERENCE_URL, SEGMENT_TIMEOUT_MS } from "../config.js";
+import { CASE_REPORT_TIMEOUT_MS, INFERENCE_URL, SEGMENT_TIMEOUT_MS, STATUS_CHECK_TIMEOUT_MS } from "../config.js";
 import { UpstreamServiceError } from "../utils/errors.js";
 
 /**
@@ -48,7 +48,9 @@ import { UpstreamServiceError } from "../utils/errors.js";
  *   PNG image bytes containing the generated segmentation mask.
  *
  * @throws UpstreamServiceError
- *   When the inference backend returns an unsuccessful HTTP response.
+ *   When the inference backend returns an unsuccessful HTTP response. The
+ *   original status code is preserved, and the message is taken from the
+ *   backend's `detail` field when present.
  *
  * @throws AbortError
  *   When the inference request exceeds the configured timeout.
@@ -68,7 +70,10 @@ export async function segmentImage(file: Express.Multer.File): Promise<Buffer> {
   });
 
   if (!inferenceRes.ok) {
-    throw new UpstreamServiceError(502, { error: "Inference service error" });
+    const payload = (await inferenceRes.json().catch(() => null)) as { detail?: string } | null;
+    throw new UpstreamServiceError(inferenceRes.status, {
+      error: payload?.detail ?? "Inference service error",
+    });
   }
 
   return Buffer.from(await inferenceRes.arrayBuffer());
@@ -121,6 +126,34 @@ export async function createCaseReport(input: unknown): Promise<unknown> {
   const payload: unknown = await reportRes.json().catch(() => ({ error: "Case report service error" }));
   if (!reportRes.ok) {
     throw new UpstreamServiceError(reportRes.status, payload);
+  }
+
+  return payload;
+}
+
+/**
+ * Checks whether the configured LLM provider is reachable, without
+ * generating a report.
+ *
+ * FastAPI's `/case-report/status` always responds 200 — an unreachable or
+ * unconfigured provider is reported as `{ reachable: false, reason }` in the
+ * body, not as an HTTP error — so this only throws on transport failure
+ * (network error or timeout), never on a "provider is down" result.
+ *
+ * @returns
+ *   Parsed `ProviderStatus` JSON as returned by the inference backend.
+ *
+ * @throws AbortError
+ *   When the request exceeds the configured timeout.
+ */
+export async function getProviderStatus(): Promise<unknown> {
+  const statusRes = await fetch(`${INFERENCE_URL}/case-report/status`, {
+    signal: AbortSignal.timeout(STATUS_CHECK_TIMEOUT_MS),
+  });
+
+  const payload: unknown = await statusRes.json().catch(() => ({ error: "Status check failed" }));
+  if (!statusRes.ok) {
+    throw new UpstreamServiceError(statusRes.status, payload);
   }
 
   return payload;
