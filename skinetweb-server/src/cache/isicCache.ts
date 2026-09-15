@@ -9,6 +9,12 @@ import { CACHE_DIR, CACHE_SENTINEL, KAGGLE_DATASET } from "../config.js";
 // Kaggle credentials must be supplied via KAGGLE_USERNAME + KAGGLE_KEY env vars.
 let cacheInitStarted = false;
 const CACHE_LOCK_DIR = path.join(CACHE_DIR, ".cache-download.lock");
+const DOWNLOAD_TIMEOUT_MS = 600_000;
+// A lock older than the download timeout can only mean the process that created it
+// died (e.g. container killed mid-download) without reaching its exec() callback,
+// which is the only place the lock is normally removed. Without this, a stale lock
+// wedges the gallery in a permanent 503 across every future restart.
+const STALE_LOCK_THRESHOLD_MS = DOWNLOAD_TIMEOUT_MS + 60_000;
 
 export function isCacheReady(): boolean {
   return fs.existsSync(CACHE_SENTINEL);
@@ -33,12 +39,27 @@ export function initCacheInBackground(): void {
   } catch (error) {
     if (isCacheReady()) return;
     if (error instanceof Error && "code" in error && error.code === "EEXIST") {
-      console.log("ISIC cache download already in progress in another server process.");
+      const lockAgeMs = Date.now() - fs.statSync(CACHE_LOCK_DIR).mtimeMs;
+      if (lockAgeMs < STALE_LOCK_THRESHOLD_MS) {
+        console.log("ISIC cache download already in progress in another server process.");
+        return;
+      }
+
+      console.log(
+        `ISIC cache lock is stale (${Math.round(lockAgeMs / 1000)}s old) - ` +
+          "a previous download was likely interrupted. Clearing it and retrying.",
+      );
+      fs.rmSync(CACHE_LOCK_DIR, { force: true, recursive: true });
+      try {
+        fs.mkdirSync(CACHE_LOCK_DIR);
+      } catch (retryError) {
+        console.error("Unable to acquire ISIC cache download lock after clearing stale lock:", retryError);
+        return;
+      }
+    } else {
+      console.error("Unable to acquire ISIC cache download lock:", error);
       return;
     }
-
-    console.error("Unable to acquire ISIC cache download lock:", error);
-    return;
   }
 
   cacheInitStarted = true;
