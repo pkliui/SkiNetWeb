@@ -49,13 +49,64 @@ body {
   margin-bottom: 14px;
 }
 
+.gallery-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 6px;
+}
+
 .gallery-group-label {
   font-size: 10px;
   font-weight: 700;
   color: #aaa;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  margin: 0 0 6px;
+  margin: 0;
+}
+
+.gallery-reload-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 1px;
+  transition: color 0.15s, transform 0.25s;
+}
+
+.gallery-reload-btn:hover:not(:disabled) {
+  color: #0a4bff;
+  transform: rotate(180deg);
+}
+
+.gallery-reload-btn:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.gallery-reload-btn--spinning {
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.gallery-thumb--skeleton {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #e8e8e8 25%, #f5f5f5 50%, #e8e8e8 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  cursor: default;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .gallery-list {
@@ -101,23 +152,66 @@ body {
   text-align: center;
 }
 
-@media (max-width: 620px) {
-  .app-container {
-    flex-direction: column;
-    align-items: center;
-  }
+/* Mobile accordion for examples */
+.gallery-accordion {
+  width: 100%;
+  border: 1.5px solid #c7d4ff;
+  border-radius: 10px;
+  background: #f4f7ff;
+  overflow: hidden;
+}
 
-  .gallery-sidebar {
-    width: 100%;
-    padding-top: 0;
-  }
+.gallery-accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2757dd;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
 
-  .gallery-list {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 12px;
-  }
+.gallery-accordion-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.gallery-accordion-arrow {
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.gallery-accordion[open] .gallery-accordion-arrow {
+  transform: rotate(180deg);
+}
+
+.gallery-accordion-body {
+  padding: 0 16px 14px;
+}
+
+.gallery-accordion-body .gallery-group-header {
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.gallery-accordion-body .gallery-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.gallery-accordion-body .gallery-thumb {
+  width: 72px;
+  height: 72px;
+}
+
+.gallery-accordion-body .gallery-thumb--skeleton {
+  width: 72px;
+  height: 72px;
 }
 
 .app-title {
@@ -131,6 +225,50 @@ body {
   font-size: 16px;
   color: #555;
   margin: -16px 0 0;
+}
+
+/* Home page description */
+.home-description {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #f4f7ff;
+  border-left: 3px solid #2757dd;
+  border-radius: 8px;
+  padding: 16px 20px;
+  font-size: 14px;
+  color: #444;
+  line-height: 1.6;
+}
+
+.home-description p {
+  margin: 0;
+}
+
+.home-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.home-step-number {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  background: #2757dd;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Navigation */
@@ -579,16 +717,16 @@ body {
 .result-card {
   background-color: #ffffff;
   border-radius: 12px;
-  padding: 16px;
+  padding: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .result-card h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 20px;
   color: #2757dd;
   font-weight: 600;
 }
@@ -597,6 +735,67 @@ body {
   width: 100%;
   border-radius: 8px;
   object-fit: contain;
+}
+
+.legend {
+  font-size: 16px;
+  font-weight: 400;
+  color: #666;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.legend-green,
+.legend-red {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+
+.legend-green { background: rgb(0, 220, 0); }
+.legend-red   { background: rgb(220, 0, 0); }
+
+.result-card--below {
+  grid-column: 1 / -1;
+  width: 50%;
+  margin: 0 auto;
+}
+
+.metric-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.metric-item {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f4f6fb;
+  border-radius: 8px;
+  padding: 4px 8px;
+  min-width: 64px;
+}
+
+.metric-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+}
+
+.metric-value {
+  font-size: 19px;
+  font-weight: 700;
+  color: #2757dd;
+  margin-top: 1px;
 }
 
 .result-placeholder {
@@ -611,8 +810,196 @@ body {
 }
 
 .result-placeholder span {
-  font-size: 13px;
+  font-size: 17px;
   color: #aaa;
   text-align: center;
-  padding: 16px;
+  padding: 8px;
+}
+
+
+/* AI case report */
+.case-report-panel {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #d6def8;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  padding: 18px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.case-report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.case-report-header h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: #2757dd;
+}
+
+.case-report-header p {
+  margin: 0;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.provider-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px 3px 8px;
+}
+
+.provider-status-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.provider-status-badge--ready {
+  color: #6dcc00;
+  background: #e6f6ec;
+}
+
+/* Reachable but a precision check (model-list confirmation) didn't clear —
+   distinct from --down so a caveat doesn't read as an outage. */
+.provider-status-badge--degraded {
+  color: #e6c700;
+  background: #fdf1de;
+}
+
+.provider-status-badge--down {
+  color: #de918d;
+  background: #fdeceb;
+}
+
+.case-report-placeholder {
+  border: 1px dashed #c7d4ff;
+  border-radius: 8px;
+  color: #667;
+  background: #f6f8ff;
+  padding: 14px;
+  font-size: 14px;
+}
+
+.case-report-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.case-report-summary,
+.prompt-trace {
+  grid-column: 1 / -1;
+}
+
+.case-report-summary {
+  background: #f6f8ff;
+  border: 1px solid #d6def8;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.case-report-summary p {
+  margin: 10px 0 0;
+  color: #333;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.case-report-summary .case-report-fallback {
+  color: #8a5200;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.case-report-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 100%;
+  border-radius: 999px;
+  background: #183b8f;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 9px;
+}
+
+/* A templated report must not be mistakable for a model-generated one at a
+   glance. Amber matches .case-report-fallback below, so the badge and the
+   explanation under it read as one note rather than two unrelated signals. */
+.case-report-badge--fallback {
+  background: #8a5200;
+}
+
+.case-report-section {
+  border: 1px solid #edf0fa;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.case-report-section h3 {
+  margin: 0 0 8px;
+  color: #333;
+  font-size: 15px;
+}
+
+.case-report-section ul,
+.prompt-trace ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #444;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.case-report-section li + li,
+.prompt-trace li + li {
+  margin-top: 6px;
+}
+
+.prompt-trace {
+  border-top: 1px solid #edf0fa;
+  padding-top: 12px;
+}
+
+.prompt-trace summary {
+  cursor: pointer;
+  color: #2757dd;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.prompt-trace ul {
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .case-report-header {
+    flex-direction: column;
+  }
+
+  .case-report-header .btn-primary {
+    width: 100%;
+  }
+
+  .case-report-content {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,44 +1,33 @@
-import express from "express";
-import cors from "cors";
-import multer from "multer";
+import "dotenv/config";
 
-const PORT = process.env.PORT || 5000;
-const INFERENCE_URL = process.env.INFERENCE_URL || "http://skinet-service:5001";
+import cors from "cors";
+import express, { type ErrorRequestHandler } from "express";
+
+import { PORT } from "./config.js";
+import { initCacheInBackground } from "./cache/isicCache.js";
+import { inferenceRouter } from "./routes/inference.js";
+import { isicRouter } from "./routes/isicRoutes.js";
 
 const app = express();
+
 app.use(cors());
+app.use(express.json({ limit: "1mb" }));
 
-const upload = multer({ storage: multer.memoryStorage() });
+app.use(inferenceRouter);
+app.use(isicRouter);
 
-app.post("/api/segment", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    res.status(400).json({ error: "No image file provided" });
+const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
+  if (res.headersSent) {
+    next(err);
     return;
   }
 
-  try {
-    const formData = new FormData();
-    const blob = new Blob([new Uint8Array(req.file.buffer)], { type: req.file.mimetype });
-    formData.append("image", blob, req.file.originalname);
+  res.status(500).json({ error: "Internal server error" });
+};
 
-    const inferenceRes = await fetch(`${INFERENCE_URL}/infer`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!inferenceRes.ok) {
-      res.status(502).json({ error: "Inference service error" });
-      return;
-    }
-
-    const maskBuffer = Buffer.from(await inferenceRes.arrayBuffer());
-    res.set("Content-Type", "image/png");
-    res.send(maskBuffer);
-  } catch {
-    res.status(503).json({ error: "Inference service unavailable" });
-  }
-});
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Backend is running on port ${PORT}`);
+  initCacheInBackground();
 });

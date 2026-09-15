@@ -9,7 +9,7 @@ services:
     depends_on:
       - frontend
       - backend
-    restart: always
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile
       context: ./nginx
@@ -21,24 +21,29 @@ services:
 
   frontend:
     image: pkliui/skinetweb:staging-frontend
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile
       context: "./skinetweb-ui"
-    ports:
-      - "3000"
     mem_reservation: "500M"
     mem_limit: "2000M"
     memswap_limit: 2G
 
   backend:
     image: pkliui/skinetweb:staging-backend
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile
       context: "./skinetweb-server"
-    ports:
-      - "5000"
     environment:
       - INFERENCE_URL=http://skinet-service:5001
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - KAGGLE_KEY=${KAGGLE_KEY}
+      - ISIC_CACHE_DIR=/isic-cache
+      - MAX_CASE_REPORT_CONCURRENCY=${MAX_CASE_REPORT_CONCURRENCY:?required, set in .env} # shared with skinet-service below; both must enforce the same limit
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:?required, set in .env} # shared with skinet-service below; both must enforce the same limit
+    volumes:
+      - isic-cache:/isic-cache
     depends_on:
       - skinet-service
     mem_reservation: "500M"
@@ -47,16 +52,27 @@ services:
 
   skinet-service:
     image: pkliui/skinetweb:staging-skinet-service
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile
       context: "./skinet-service"
-    ports:
-      - "5001"
     environment:
-      - MODEL_PATH=/models/ios_onnx.onnx
-      - SEGMENTATION_THRESHOLD=0.5
+      - CONFIG_PATH=${CONFIG_PATH:?required, set in .env}
+      - MODEL_PATH=${MODEL_PATH:?required, set in .env}
+      - INFER_SLOW_WARN_SECONDS=${INFER_SLOW_WARN_SECONDS:?required, set in .env}
+      - MAX_CASE_REPORT_CONCURRENCY=${MAX_CASE_REPORT_CONCURRENCY:?required, set in .env} # shared with backend above; both must enforce the same limit
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:?required, set in .env} # shared with backend above; both must enforce the same limit
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - MISTRAL_MODEL=${MISTRAL_MODEL:-mistral-medium-2604}
+      - MISTRAL_BASE_URL=${MISTRAL_BASE_URL:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-}
     volumes:
       - ./models:/models:ro
     mem_reservation: "500M"
     mem_limit: "2000M"
     memswap_limit: 2G
+
+volumes:
+  isic-cache:

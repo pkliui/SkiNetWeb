@@ -13,8 +13,9 @@ import { useState, useRef } from "react";
 /** All reactive values exposed to the UI */
 type SegmentationState = {
   selectedFile: File | null;
-  previewUrl: string | null;   // object URL for the local preview image
-  resultUrl: string | null;    // object URL for the segmentation mask returned by the API
+  previewUrl: string | null;
+  resultUrl: string | null;
+  gtMaskUrl: string | null;    // object URL for an optional ground-truth mask
   isLoading: boolean;
   error: string | null;
 };
@@ -34,18 +35,25 @@ export const useSegmentation = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl]     = useState<string | null>(null);
   const [resultUrl, setResultUrl]       = useState<string | null>(null);
+  const [gtMaskUrl, setGtMaskUrl]       = useState<string | null>(null);
   const [isLoading, setIsLoading]       = useState(false);
   const [error, setError]               = useState<string | null>(null);
 
   // Ref forwarded to the hidden <input type="file"> inside UploadZone
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /** Called whenever the user picks or drops a new file. */
-  const onFileSelect = (file: File) => {
-    setSelectedFile(file);
-    setResultUrl(null);   // clear any previous result
+  /** Called whenever the user picks or drops one or more files.
+   *  If a second file with "_lesion" in its name is present it is treated as the GT mask. */
+  const onFileSelect = (fileOrFiles: File | File[]) => {
+    const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+    const imageFile = files.find(f => !f.name.includes("_lesion")) ?? files[0];
+    const gtFile    = files.find(f =>  f.name.includes("_lesion")) ?? null;
+
+    setSelectedFile(imageFile);
+    setResultUrl(null);
     setError(null);
-    setPreviewUrl(URL.createObjectURL(file));
+    setPreviewUrl(URL.createObjectURL(imageFile));
+    setGtMaskUrl(gtFile ? URL.createObjectURL(gtFile) : null);
   };
 
   /** Sends the selected image to the backend and stores the returned mask URL. */
@@ -93,12 +101,13 @@ export const useSegmentation = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
     setResultUrl(null);
+    setGtMaskUrl(null);
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return {
-    selectedFile, previewUrl, resultUrl, isLoading, error,
+    selectedFile, previewUrl, resultUrl, gtMaskUrl, isLoading, error,
     fileInputRef, onFileSelect, onSubmit, onReset,
   };
 };
