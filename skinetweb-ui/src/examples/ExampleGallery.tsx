@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { EXAMPLE_URL_DRAG_TYPE } from "../types/upload";
 import { urlToFile } from "../utils/imageUtils";
 
 type IsicExample = { imageSrc: string; gtSrc: string | null; label: string };
@@ -73,7 +74,7 @@ const ExampleGallery = ({ onFileSelect, variant = "sidebar" }: Props) => {
                 alt={ex.label}
                 className="gallery-thumb"
                 draggable
-                onDragStart={(e) => e.dataTransfer.setData("x-example-url", ex.imageSrc)}
+                onDragStart={(e) => e.dataTransfer.setData(EXAMPLE_URL_DRAG_TYPE, ex.imageSrc)}
                 onClick={() => select(ex.imageSrc, ex.gtSrc, `${ex.label}.jpg`)}
               />
               <span className="gallery-label">{ex.label.replace("ISIC_", "")}</span>

@@ -9,7 +9,7 @@
  */
 
 import React, { useState } from "react";
-import { ALLOWED_IMAGE_MIME_TYPES } from "../types/upload";
+import { ALLOWED_IMAGE_MIME_TYPES, EXAMPLE_URL_DRAG_TYPE } from "../types/upload";
 import { urlToFile } from "../utils/imageUtils";
 
 type Props = {
@@ -29,7 +29,7 @@ const UploadZone = ({ selectedFile, fileInputRef, onFileSelect }: Props) => {
     event.preventDefault();
     setIsDragging(false);
 
-    const exampleUrl = event.dataTransfer.getData("x-example-url");
+    const exampleUrl = event.dataTransfer.getData(EXAMPLE_URL_DRAG_TYPE);
     if (exampleUrl) {
       try {
         const filename = exampleUrl.split("/").pop() ?? "example.png";

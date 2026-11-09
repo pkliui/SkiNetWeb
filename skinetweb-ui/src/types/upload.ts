@@ -30,3 +30,13 @@ const MAX_UPLOAD_MB = Math.round((MAX_UPLOAD_BYTES / (1024 * 1024)) * 10) / 10;
 
 /** Same wording as the server's 413, so the user sees one message either way. */
 export const UPLOAD_TOO_LARGE_MESSAGE = `Image is too large. Maximum size is ${MAX_UPLOAD_MB} MB.`;
+
+/**
+ * Drag-data key for a thumbnail dragged from ExampleGallery.
+ *
+ * The gallery puts the example's image URL under this key when a drag starts.
+ * UploadZone reads it on drop: if it's present, the drop came from the gallery
+ * and the URL is fetched into a File; if it isn't, the drop is a real file
+ * from disk.
+ */
+export const EXAMPLE_URL_DRAG_TYPE = "x-example-url";
