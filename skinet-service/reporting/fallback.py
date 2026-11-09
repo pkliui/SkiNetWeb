@@ -42,9 +42,9 @@ class DeterministicReportBuilder:
 
         return CaseReport(
             summary=(
-                f"Segmentation completed for {request.file_name or 'the uploaded dermoscopy image'} using SkiNet segmentation model"
-                "trained on ISIC 2017 dataset. Predicted segmentation mask is shown in green. If user provided an ISIC 2017 test image"
-                "available in EXAMPLES column, ground truth mask is shown in red. If user uploaded a photo, no ground truth is available."
+                f"Segmentation completed for {request.file_name or 'the uploaded dermoscopy image'} using SkiNet segmentation model "
+                "trained on ISIC 2017 dataset. Predicted segmentation mask is shown in green. If user provided an ISIC 2017 test image "
+                "available in EXAMPLES column, ground truth mask is shown in red. If user uploaded a photo, no ground truth is available. "
                 "This report presents model output results and does not constitute a medical diagnosis."
             ),
             observations=[

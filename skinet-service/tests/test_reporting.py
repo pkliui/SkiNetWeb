@@ -161,8 +161,18 @@ def test_fallback_report_is_truthful_when_metrics_are_missing() -> None:
     report = build_fallback_report(CaseReportRequest(), reason="unit-test")
     payload = report.model_dump(by_alias=True)
 
-    assert "not available" in payload["summary"]
+    assert payload["observations"][0] == "Predicted lesion area: not available."
     assert payload["qualityChecks"][0] == "Segmentation metrics were not supplied with this report request."
+
+
+def test_fallback_summary_joins_its_sentences_with_spaces() -> None:
+    summary = build_fallback_report(CaseReportRequest(), reason="unit-test").summary
+
+    # The summary is built from adjacent string literals; a missing trailing space
+    # glues words together ("modeltrained", "available.This").
+    assert "modeltrained" not in summary
+    assert "imageavailable" not in summary
+    assert ".This" not in summary
 
 
 def test_llm_payload_rejects_empty_report_items() -> None:

@@ -10,6 +10,13 @@
 
 import { useState, useRef } from "react";
 
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  MAX_UPLOAD_BYTES,
+  UNSUPPORTED_IMAGE_TYPE_MESSAGE,
+  UPLOAD_TOO_LARGE_MESSAGE,
+} from "../types/upload";
+
 /** All reactive values exposed to the UI */
 type SegmentationState = {
   selectedFile: File | null;
@@ -49,6 +56,20 @@ export const useSegmentation = () => {
     const imageFile = files.find(f => !f.name.includes("_lesion")) ?? files[0];
     const gtFile    = files.find(f =>  f.name.includes("_lesion")) ?? null;
 
+    // Convenience checks only (the server re-checks the type, the actual bytes and
+    // the size). They run for every route in, including drag-and-drop, which the
+    // picker's `accept` filter does not cover, and reject before any upload.
+    if (!ALLOWED_IMAGE_MIME_TYPES.includes(imageFile.type)) {
+      onReset();
+      setError(UNSUPPORTED_IMAGE_TYPE_MESSAGE);
+      return;
+    }
+    if (imageFile.size > MAX_UPLOAD_BYTES) {
+      onReset();
+      setError(UPLOAD_TOO_LARGE_MESSAGE);
+      return;
+    }
+
     setSelectedFile(imageFile);
     setResultUrl(null);
     setError(null);
@@ -74,9 +95,17 @@ export const useSegmentation = () => {
       });
 
       if (!response.ok) {
-        // Nginx body-size limit — give the user an actionable message
+        // A 413 comes from one of two places:
+        // - Express: the file is over MAX_UPLOAD_BYTES (10 MiB).
+        // - nginx: the whole request is over client_max_body_size (11 MB), so Express never sees it.
+        // Both send JSON whose `error` names the limit (nginx via the error_page in
+        // nginx/default.conf). The generic text is a safety net so the user always
+        // gets a message when a 413 body isn't that JSON: e.g. Cloudflare, in front
+        // of nginx, rejects bodies over its own limit (100 MB on the free plan) with
+        // an HTML page, and neither nginx nor Express ever sees the request.
         if (response.status === 413) {
-          setError("Image is too large. Please use a smaller photo.");
+          const err = await response.json().catch(() => null) as { error?: string } | null;
+          setError(err?.error ?? "Image is too large. Please use a smaller photo.");
           return;
         }
         const err = await response
