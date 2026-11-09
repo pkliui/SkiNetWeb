@@ -68,8 +68,8 @@ export const MAX_SEGMENT_CONCURRENCY = env.MAX_SEGMENT_CONCURRENCY;
 export const MAX_CASE_REPORT_CONCURRENCY = env.MAX_CASE_REPORT_CONCURRENCY;
 export const MAX_UPLOAD_BYTES = env.MAX_UPLOAD_BYTES;
 
-// Declared MIME types accepted for upload. Must match the keys of
-// ALLOWED_IMAGE_TYPES in skinet-service/main.py, which also checks the actual
+// Declared MIME types accepted for upload. Must match the PIL formats in
+// ALLOWED_IMAGE_FORMATS in skinet-service/main.py, which checks the actual
 // bytes, so this list is only the cheap early rejection.
 export const ALLOWED_IMAGE_MIME_TYPES: ReadonlySet<string> = new Set(["image/jpeg", "image/png"]);
 

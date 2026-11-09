@@ -46,11 +46,11 @@ stdout_logging(logging.INFO)
 file_logging()
 logger = logging.getLogger(__name__)
 
-# Upload types accepted by /infer: declared MIME type -> PIL format name. The keys
-# gate the cheap `Content-Type` check in `infer`; the values restrict which decoders
-# `preprocess` will try, so the actual bytes must be one of these formats too.
+# Image formats accepted by /infer, as PIL format names. `preprocess` only tries
+# these decoders, so this is checked against the actual bytes, not the declared
+# `Content-Type` (the Node proxy does that cheaper header check before forwarding).
 # Keep in sync with ALLOWED_IMAGE_MIME_TYPES in skinetweb-server/src/config.ts.
-ALLOWED_IMAGE_TYPES: dict[str, str] = {"image/jpeg": "JPEG", "image/png": "PNG"}
+ALLOWED_IMAGE_FORMATS: tuple[str, ...] = ("JPEG", "PNG")
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ def preprocess(image_bytes: bytes) -> tuple:
             total size, MAX_UPLOAD_BYTES), then passed through `_run_inference`
             without modification. This function is the first point where the
             bytes are decoded — any invalid/corrupt image, or a valid image in a
-            format outside `ALLOWED_IMAGE_TYPES` (e.g. a GIF declared as
+            format outside `ALLOWED_IMAGE_FORMATS` (e.g. a GIF declared as
             `image/png`), is flagged here as
             `UnidentifiedImageError`, `ValueError`, `OSError`, or (for an
             image whose declared dimensions decode to more than
@@ -189,7 +189,7 @@ def preprocess(image_bytes: bytes) -> tuple:
         crop_top: y-offset in original-image pixels where the square crop began.
     """
     img = ImageOps.exif_transpose(
-        Image.open(io.BytesIO(image_bytes), formats=list(ALLOWED_IMAGE_TYPES.values()))
+        Image.open(io.BytesIO(image_bytes), formats=list(ALLOWED_IMAGE_FORMATS))
     ).convert("RGB")
     original_size = img.size  # (width, height)
 
@@ -345,13 +345,12 @@ async def infer(request: Request, image: UploadFile = File(...)) -> Response:
 
     Accepts a multipart-form upload (field ``image``) of a JPEG or PNG.
 
-    The `content_type` check below only reads the `Content-Type` header the
-    client sent with the file; it does not look at the file's actual bytes.
-    The upstream Node proxy performs the same header check before forwarding.
-    So a mismatched or corrupt file can still pass here, and fails only
-    later, when PIL tries to decode it in `preprocess` (which only tries the
-    decoders for `ALLOWED_IMAGE_TYPES`). Such failures surface as a 400 from
-    the `try`/`except` block below.
+    The declared `Content-Type` is not checked here: it is client-controlled,
+    and the upstream Node proxy already rejects anything not declared as
+    JPEG/PNG. The real format check is PIL decoding the bytes in `preprocess`
+    (which only tries the decoders for `ALLOWED_IMAGE_FORMATS`), so a
+    mislabelled or corrupt file surfaces as a 400 from the `try`/`except`
+    block below.
 
     Size is capped at `MAX_UPLOAD_BYTES` by `_read_capped`.
 
@@ -386,9 +385,6 @@ async def infer(request: Request, image: UploadFile = File(...)) -> Response:
     - Anything else (e.g. a model/runtime bug) -> 500, logged with a full
       traceback since it indicates a bug in this service.
     """
-    if image.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Only JPEG and PNG images are supported")
-
     image_bytes = await _read_capped(image, MAX_UPLOAD_BYTES)
     request_id = uuid.uuid4().hex[:8]
     try:

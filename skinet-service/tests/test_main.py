@@ -316,18 +316,6 @@ def test_preprocess_rejects_valid_image_in_disallowed_format():
         preprocess(_solid_image_bytes("GIF"))
 
 
-def test_infer_rejects_disallowed_declared_type_before_decoding():
-    fake_session = _FakeSession(_full_mask_output())
-    upload = _upload(_solid_image_bytes("GIF"), "image/gif")
-
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(infer(_request_with_session(fake_session), upload))
-
-    assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Only JPEG and PNG images are supported"
-    assert fake_session.calls == []
-
-
 def test_infer_rejects_gif_mislabelled_as_png():
     fake_session = _FakeSession(_full_mask_output())
     upload = _upload(_solid_image_bytes("GIF"), "image/png")
