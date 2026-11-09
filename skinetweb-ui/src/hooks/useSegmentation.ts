@@ -10,7 +10,12 @@
 
 import { useState, useRef } from "react";
 
-import { ALLOWED_IMAGE_MIME_TYPES, UNSUPPORTED_IMAGE_TYPE_MESSAGE } from "../types/upload";
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  MAX_UPLOAD_BYTES,
+  UNSUPPORTED_IMAGE_TYPE_MESSAGE,
+  UPLOAD_TOO_LARGE_MESSAGE,
+} from "../types/upload";
 
 /** All reactive values exposed to the UI */
 type SegmentationState = {
@@ -51,12 +56,17 @@ export const useSegmentation = () => {
     const imageFile = files.find(f => !f.name.includes("_lesion")) ?? files[0];
     const gtFile    = files.find(f =>  f.name.includes("_lesion")) ?? null;
 
-    // Convenience check only (the server re-checks the type and the actual bytes).
-    // Runs for every route in, including drag-and-drop, which the picker's
-    // `accept` filter does not cover.
+    // Convenience checks only (the server re-checks the type, the actual bytes and
+    // the size). They run for every route in, including drag-and-drop, which the
+    // picker's `accept` filter does not cover, and reject before any upload.
     if (!ALLOWED_IMAGE_MIME_TYPES.includes(imageFile.type)) {
       onReset();
       setError(UNSUPPORTED_IMAGE_TYPE_MESSAGE);
+      return;
+    }
+    if (imageFile.size > MAX_UPLOAD_BYTES) {
+      onReset();
+      setError(UPLOAD_TOO_LARGE_MESSAGE);
       return;
     }
 
