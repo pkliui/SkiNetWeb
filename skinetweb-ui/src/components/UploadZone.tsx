@@ -9,6 +9,7 @@
  */
 
 import React, { useState } from "react";
+import { ALLOWED_IMAGE_MIME_TYPES } from "../types/upload";
 import { urlToFile } from "../utils/imageUtils";
 
 type Props = {
@@ -73,7 +74,7 @@ const UploadZone = ({ selectedFile, fileInputRef, onFileSelect }: Props) => {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png"
+        accept={ALLOWED_IMAGE_MIME_TYPES.join(",")}
         style={{ display: "none" }}
         onChange={handleFileChange}
       />
