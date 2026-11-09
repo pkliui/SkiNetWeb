@@ -29,7 +29,7 @@ type SegmentationState = {
 
 /** Callbacks and refs exposed to the UI */
 type SegmentationActions = {
-  onFileSelect: (file: File) => void;
+  acceptFile: (fileOrFiles: File | File[]) => void;
   onSubmit: () => Promise<void>;
   onReset: () => void;
   // Passed down to UploadZone so it can programmatically open the file picker.
@@ -51,7 +51,7 @@ export const useSegmentation = () => {
 
   /** Called whenever the user picks or drops one or more files.
    *  If a second file with "_lesion" in its name is present it is treated as the GT mask. */
-  const onFileSelect = (fileOrFiles: File | File[]) => {
+  const acceptFile = (fileOrFiles: File | File[]) => {
     const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
     const imageFile = files.find(f => !f.name.includes("_lesion")) ?? files[0];
     const gtFile    = files.find(f =>  f.name.includes("_lesion")) ?? null;
@@ -137,6 +137,6 @@ export const useSegmentation = () => {
 
   return {
     selectedFile, previewUrl, resultUrl, gtMaskUrl, isLoading, error,
-    fileInputRef, onFileSelect, onSubmit, onReset,
+    fileInputRef, acceptFile, onSubmit, onReset,
   };
 };

@@ -16,7 +16,7 @@ const HomePage = () => {
     isLoading,
     error,
     fileInputRef,
-    onFileSelect,
+    acceptFile,
     onSubmit,
     onReset,
   } = useSegmentation();
@@ -28,8 +28,8 @@ const HomePage = () => {
 
   const handleFileSelect = useCallback((fileOrFiles: File | File[]) => {
     setMetrics(null);
-    onFileSelect(fileOrFiles);
-  }, [onFileSelect]);
+    acceptFile(fileOrFiles);
+  }, [acceptFile]);
 
   const handleSubmit = useCallback(async () => {
     setMetrics(null);
