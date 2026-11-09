@@ -68,6 +68,11 @@ export const MAX_SEGMENT_CONCURRENCY = env.MAX_SEGMENT_CONCURRENCY;
 export const MAX_CASE_REPORT_CONCURRENCY = env.MAX_CASE_REPORT_CONCURRENCY;
 export const MAX_UPLOAD_BYTES = env.MAX_UPLOAD_BYTES;
 
+// Declared MIME types accepted for upload. Must match the keys of
+// ALLOWED_IMAGE_TYPES in skinet-service/main.py, which also checks the actual
+// bytes, so this list is only the cheap early rejection.
+export const ALLOWED_IMAGE_MIME_TYPES: ReadonlySet<string> = new Set(["image/jpeg", "image/png"]);
+
 // Persistent cache dir. Mount a named Docker volume here so the download
 // survives container restarts. Falls back to /tmp in local dev.
 export const CACHE_DIR = env.ISIC_CACHE_DIR;

@@ -1,7 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import multer from "multer";
 
-import { MAX_UPLOAD_BYTES } from "../config.js";
+import { ALLOWED_IMAGE_MIME_TYPES, MAX_UPLOAD_BYTES } from "../config.js";
 
 /**
  * Error thrown when an uploaded file is not a supported image type.
@@ -44,7 +44,7 @@ const imageUpload = multer({
       files: 1,
     },
     fileFilter: (_req, file, cb) => {
-      if (file.mimetype === "image/jpeg" || file.mimetype === "image/png") {
+      if (ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
         cb(null, true);
         return;
       }

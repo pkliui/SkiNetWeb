@@ -1,12 +1,13 @@
 import asyncio
 import io
 import logging
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 from fastapi import HTTPException
 from PIL import Image, UnidentifiedImageError
-from starlette.datastructures import UploadFile
+from starlette.datastructures import Headers, UploadFile
 
 import main
 from main import (
@@ -15,6 +16,7 @@ from main import (
     _read_capped,
     _run_inference,
     _run_with_slow_warning,
+    infer,
     postprocess,
     preprocess,
 )
@@ -278,6 +280,63 @@ def test_run_inference_propagates_preprocess_errors_without_calling_session():
     with pytest.raises(UnidentifiedImageError):
         _run_inference(fake_session, b"not an image")
 
+    assert fake_session.calls == []
+
+
+# ---------------------------------------------------------------------------
+# Allowed formats — declared Content-Type is checked first, the real bytes second
+# ---------------------------------------------------------------------------
+
+
+def _solid_image_bytes(fmt: str) -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", (32, 32), (200, 100, 50)).save(buf, format=fmt)
+    return buf.getvalue()
+
+
+def _upload(data: bytes, content_type: str) -> UploadFile:
+    return UploadFile(file=io.BytesIO(data), filename="upload", headers=Headers({"content-type": content_type}))
+
+
+def _request_with_session(session: _FakeSession) -> SimpleNamespace:
+    # `infer` only reads `request.state.session`, so a namespace stands in for a Request.
+    return SimpleNamespace(state=SimpleNamespace(session=session))
+
+
+def test_preprocess_accepts_png():
+    arr, original_size, _, _ = preprocess(_solid_image_bytes("PNG"))
+
+    assert arr.shape == (1, 3, INPUT_SIZE, INPUT_SIZE)
+    assert original_size == (32, 32)
+
+
+def test_preprocess_rejects_valid_image_in_disallowed_format():
+    # A well-formed GIF decodes fine with an unrestricted Image.open; it must not here.
+    with pytest.raises(UnidentifiedImageError):
+        preprocess(_solid_image_bytes("GIF"))
+
+
+def test_infer_rejects_disallowed_declared_type_before_decoding():
+    fake_session = _FakeSession(_full_mask_output())
+    upload = _upload(_solid_image_bytes("GIF"), "image/gif")
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(infer(_request_with_session(fake_session), upload))
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Only JPEG and PNG images are supported"
+    assert fake_session.calls == []
+
+
+def test_infer_rejects_gif_mislabelled_as_png():
+    fake_session = _FakeSession(_full_mask_output())
+    upload = _upload(_solid_image_bytes("GIF"), "image/png")
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(infer(_request_with_session(fake_session), upload))
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Could not process the uploaded image"
     assert fake_session.calls == []
 
 
