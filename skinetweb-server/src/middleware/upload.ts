@@ -12,6 +12,10 @@ import { ALLOWED_IMAGE_MIME_TYPES, MAX_UPLOAD_BYTES } from "../config.js";
  */
 class UnsupportedImageTypeError extends Error {}
 
+// MAX_UPLOAD_BYTES is a whole number of MiB (10 MiB in .env.config); round to one
+// decimal so the message stays readable if it ever isn't.
+const MAX_UPLOAD_MB = Math.round((MAX_UPLOAD_BYTES / (1024 * 1024)) * 10) / 10;
+
 /**
  * Multer configuration for handling image uploads.
  *
@@ -92,7 +96,7 @@ export const parseImageUpload: RequestHandler = (
     }
 
     if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
-      res.status(413).json({ error: "Image is too large. Please use a smaller photo." });
+      res.status(413).json({ error: `Image is too large. Maximum size is ${MAX_UPLOAD_MB} MB.` });
       return;
     }
 

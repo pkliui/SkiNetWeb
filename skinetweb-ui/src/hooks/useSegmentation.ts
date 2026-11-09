@@ -74,9 +74,17 @@ export const useSegmentation = () => {
       });
 
       if (!response.ok) {
-        // Nginx body-size limit — give the user an actionable message
+        // A 413 comes from one of two places:
+        // - Express: the file is over MAX_UPLOAD_BYTES (10 MiB).
+        // - nginx: the whole request is over client_max_body_size (11 MB), so Express never sees it.
+        // Both send JSON whose `error` names the limit (nginx via the error_page in
+        // nginx/default.conf). The generic text is a safety net so the user always
+        // gets a message when a 413 body isn't that JSON: e.g. Cloudflare, in front
+        // of nginx, rejects bodies over its own limit (100 MB on the free plan) with
+        // an HTML page, and neither nginx nor Express ever sees the request.
         if (response.status === 413) {
-          setError("Image is too large. Please use a smaller photo.");
+          const err = await response.json().catch(() => null) as { error?: string } | null;
+          setError(err?.error ?? "Image is too large. Please use a smaller photo.");
           return;
         }
         const err = await response
