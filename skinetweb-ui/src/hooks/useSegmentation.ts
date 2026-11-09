@@ -56,9 +56,11 @@ export const useSegmentation = () => {
     const imageFile = files.find(f => !f.name.includes("_lesion")) ?? files[0];
     const gtFile    = files.find(f =>  f.name.includes("_lesion")) ?? null;
 
-    // Convenience checks only (the server re-checks the type, the actual bytes and
-    // the size). They run for every route in, including drag-and-drop, which the
-    // picker's `accept` filter does not cover, and reject before any upload.
+    // Convenience checks only: the server re-checks the type and the size. Neither
+    // these checks nor Express look at the actual bytes; only the inference service
+    // does, when it decodes the image. They run for every route in, including
+    // drag-and-drop, which the picker's `accept` filter does not cover, and reject
+    // before any upload.
     if (!ALLOWED_IMAGE_MIME_TYPES.includes(imageFile.type)) {
       onReset();
       setError(UNSUPPORTED_IMAGE_TYPE_MESSAGE);
@@ -95,6 +97,9 @@ export const useSegmentation = () => {
       });
 
       if (!response.ok) {
+        // This 413 branch is a backstop: acceptFile already rejects files over
+        // MAX_UPLOAD_BYTES before anything is uploaded. Reaching it usually means the
+        // UI's limit (types/upload.ts) and the server's limits have drifted apart.
         // A 413 comes from one of two places:
         // - Express: the file is over MAX_UPLOAD_BYTES (10 MiB).
         // - nginx: the whole request is over client_max_body_size (11 MB), so Express never sees it.

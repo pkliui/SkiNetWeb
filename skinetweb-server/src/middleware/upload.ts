@@ -17,7 +17,8 @@ class UnsupportedImageTypeError extends Error {}
 const MAX_UPLOAD_MB = Math.round((MAX_UPLOAD_BYTES / (1024 * 1024)) * 10) / 10;
 
 /**
- * Multer configuration for handling image uploads.
+ * Multer instance configured for image uploads (memory storage, size and
+ * type limits). `parseImageUpload` calls `.single("image")` on it.
  *
  * This uploader is configured for the segmentation endpoint, where uploaded
  * images are not persisted locally. Files are stored in memory because they are
@@ -29,14 +30,15 @@ const MAX_UPLOAD_MB = Math.round((MAX_UPLOAD_BYTES / (1024 * 1024)) * 10) / 10;
  *    "image" field.
  * 2. `imageUpload.single("image")` activates Multer processing for the request.
  * 3. Multer extracts the uploaded file metadata and invokes `fileFilter`.
- * 4. The filter validates the MIME type before allowing the upload to proceed.
+ * 4. The filter checks the declared MIME type before allowing the upload to proceed.
  * 5. Accepted files are stored in memory and exposed through `req.file`.
  *
  * Security and resource constraints:
  * - Only one file is accepted per request.
  * - Maximum upload size is limited by MAX_UPLOAD_BYTES to prevent excessive
  *   memory consumption.
- * - Only JPEG and PNG images are accepted.
+ * - Only files declared as JPEG or PNG are accepted (header check; the
+ *   inference service checks the actual content).
  *
  * Rejected uploads are propagated as errors and converted into API responses
  * by `parseImageUpload`.
@@ -68,7 +70,8 @@ const imageUpload = multer({
  * - Content-Type: multipart/form-data
  * - File field name: "image"
  * - Maximum files: 1
- * - Supported formats: JPEG, PNG
+ * - Declared type: image/jpeg or image/png (the part's Content-Type header
+ *   only; the inference service checks the actual content)
  *
  * On successful processing:
  * - Multer attaches the uploaded file to `req.file`.
@@ -82,7 +85,9 @@ const imageUpload = multer({
  *   The uploaded file type is unsupported or the upload payload is invalid.
  *
  * The controller layer can assume that when this middleware completes
- * successfully, `req.file` contains a validated image ready for inference.
+ * successfully, `req.file` holds one file within the size limit with an allowed
+ * declared type. Whether the bytes are a real JPEG/PNG is only known once the
+ * inference service decodes them.
  */
 export const parseImageUpload: RequestHandler = (
   req: Request,

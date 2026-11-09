@@ -17,7 +17,7 @@ Live at [skinet.pkliuiev.workers.dev](https://skinet.pkliuiev.workers.dev) — s
 ## How it works
 
 1. User uploads a dermoscopy image (or picks one from the example gallery).
-2. The frontend sends the image to the Node.js backend.
+2. The frontend sends the image to the Node.js backend. See [docs/segment-request-path.md](docs/segment-request-path.md) for the full request/response trace (React state → nginx → Express → FastAPI) and where each upload check (type, size) runs.
 3. The backend forwards it to the Python inference service (`POST /infer`).
 4. The inference service preprocesses the image (center-crop → resize to 256 × 256 → ISIC 2017 normalisation), runs the ONNX model, and returns a PNG mask.
 5. The frontend displays the original image, segmentation overlay, and metrics.
